@@ -1,6 +1,6 @@
 # Plan directeur de `lxp-mini-1xm`
 
-> Statut : proposition d'architecture et de livraison, avant PR01  
+> Statut : plan accepté; PR01 implémentée sur `feature/pr01-project-foundation`
 > Source de vérité initiale : [`docs2/project.md`](../docs2/project.md)  
 > Dernière mise à jour : 2026-08-29
 
@@ -158,10 +158,10 @@ lxp-mini-1xm/
 │       └── pr-01-project-foundation.md
 ├── gradle/wrapper/
 ├── src/
-│   ├── main/kotlin/dev/lxpmini/
+│   ├── main/kotlin/io/github/lxptechnologies/lxpmini/
 │   │   ├── cli/
 │   │   └── config/
-│   └── test/kotlin/dev/lxpmini/
+│   └── test/kotlin/io/github/lxptechnologies/lxpmini/
 │       └── config/
 ├── .gitignore
 ├── build.gradle.kts
@@ -172,7 +172,7 @@ lxp-mini-1xm/
 └── LICENSE
 ```
 
-Arborescence logique future sous `dev.lxpmini` :
+Arborescence logique future sous `io.github.lxptechnologies.lxpmini` :
 
 ```text
 tokenizer/   # PR02-03
@@ -190,8 +190,8 @@ evaluation/  # PR12
 | Outil | Usage | Décision |
 |---|---|---|
 | JDK 25 | compilation et exécution | imposé par le projet |
-| Gradle Wrapper 9.1+ | build reproductible avec Java 25 | version exacte figée en PR01 |
-| Kotlin/JVM | toute la logique applicative | version stable compatible figée en PR01 |
+| Gradle Wrapper 9.1.0 | build reproductible avec Java 25 | validé en PR01 |
+| Kotlin/JVM 2.3.0 | toute la logique applicative | validé avec la cible JVM 25 en PR01 |
 | JUnit 5 | tests | oui dès PR01 |
 | GitHub Actions | CI sur build et tests | oui dès PR01 |
 | NVIDIA GPU + pilotes compatibles | accélération facultative | recommandé pour le 17 M, non requis pour les tests |
@@ -290,7 +290,7 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 
 | Question | Quand décider | Preuve nécessaire |
 |---|---:|---|
-| Version exacte Kotlin/Jackson/Picocli | PR01 | build JDK 25 et CI verts |
+| Mise à niveau Kotlin/Jackson/Picocli | PR future dédiée | compatibilité, notes de version et build JDK 25 verts |
 | Format JSON exact du tokenizer | PR03 | round-trip et compatibilité de version |
 | Stratégie de lecture des gros corpus | PR04 | mesure mémoire et débit |
 | Initialisation des poids | PR05/PR08 | absence de NaN et single-batch overfit |
@@ -631,7 +631,7 @@ La perplexité vaut `exp(loss)` pour une cross-entropy moyenne en logarithme nat
 
 ## 14. Definition of Done de PR01
 
-PR01 pourra commencer sur la base de ce plan et sera terminée lorsque :
+PR01 a été implémentée sur la base de ce plan. Elle est terminée lorsque :
 
 - le wrapper Gradle compatible JDK 25 fonctionne sur Windows et CI;
 - `./gradlew.bat test` est vert;
