@@ -1,7 +1,7 @@
-package dev.lxpmini.model
+package io.github.lxptechnologies.lxpmini.model
 
-import dev.lxpmini.config.ConfigLoader
-import dev.lxpmini.config.validModelConfig
+import io.github.lxptechnologies.lxpmini.config.ConfigLoader
+import io.github.lxptechnologies.lxpmini.config.validModelConfig
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.nio.file.Path

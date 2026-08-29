@@ -1,4 +1,4 @@
-package dev.lxpmini.cli
+package io.github.lxptechnologies.lxpmini.cli
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test

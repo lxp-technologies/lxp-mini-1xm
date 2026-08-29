@@ -3,7 +3,7 @@ plugins {
     application
 }
 
-group = "dev.lxpmini"
+group = "io.github.lxp-technologies"
 version = "0.1.0-SNAPSHOT"
 
 repositories {
@@ -26,7 +26,7 @@ kotlin {
 }
 
 application {
-    mainClass = "dev.lxpmini.MainKt"
+    mainClass = "io.github.lxptechnologies.lxpmini.MainKt"
 }
 
 tasks.test {

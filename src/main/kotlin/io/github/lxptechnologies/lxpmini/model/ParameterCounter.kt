@@ -1,6 +1,6 @@
-package dev.lxpmini.model
+package io.github.lxptechnologies.lxpmini.model
 
-import dev.lxpmini.config.ModelConfig
+import io.github.lxptechnologies.lxpmini.config.ModelConfig
 import java.text.NumberFormat
 import java.util.Locale
 

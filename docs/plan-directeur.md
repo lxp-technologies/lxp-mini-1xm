@@ -158,10 +158,10 @@ lxp-mini-1xm/
 │       └── pr-01-project-foundation.md
 ├── gradle/wrapper/
 ├── src/
-│   ├── main/kotlin/dev/lxpmini/
+│   ├── main/kotlin/io/github/lxptechnologies/lxpmini/
 │   │   ├── cli/
 │   │   └── config/
-│   └── test/kotlin/dev/lxpmini/
+│   └── test/kotlin/io/github/lxptechnologies/lxpmini/
 │       └── config/
 ├── .gitignore
 ├── build.gradle.kts
@@ -172,7 +172,7 @@ lxp-mini-1xm/
 └── LICENSE
 ```
 
-Arborescence logique future sous `dev.lxpmini` :
+Arborescence logique future sous `io.github.lxptechnologies.lxpmini` :
 
 ```text
 tokenizer/   # PR02-03

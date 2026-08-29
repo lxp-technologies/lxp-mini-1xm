@@ -1,4 +1,4 @@
-package dev.lxpmini.config
+package io.github.lxptechnologies.lxpmini.config
 
 class ConfigValidator {
     fun validate(config: ProjectConfig): ProjectConfig {

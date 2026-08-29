@@ -1,6 +1,6 @@
-package dev.lxpmini
+package io.github.lxptechnologies.lxpmini
 
-import dev.lxpmini.cli.LxpMiniCommand
+import io.github.lxptechnologies.lxpmini.cli.LxpMiniCommand
 import picocli.CommandLine
 import kotlin.system.exitProcess
 

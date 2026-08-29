@@ -1,4 +1,4 @@
-package dev.lxpmini.config
+package io.github.lxptechnologies.lxpmini.config
 
 fun validProjectConfig(
     model: ModelConfig = validModelConfig(),

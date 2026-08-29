@@ -1,4 +1,4 @@
-package dev.lxpmini.config
+package io.github.lxptechnologies.lxpmini.config
 
 data class ProjectConfig(
     val model: ModelConfig,

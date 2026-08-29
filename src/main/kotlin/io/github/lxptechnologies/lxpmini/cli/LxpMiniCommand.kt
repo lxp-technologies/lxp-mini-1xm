@@ -1,8 +1,8 @@
-package dev.lxpmini.cli
+package io.github.lxptechnologies.lxpmini.cli
 
-import dev.lxpmini.config.ConfigException
-import dev.lxpmini.config.ConfigLoader
-import dev.lxpmini.model.ParameterCounter
+import io.github.lxptechnologies.lxpmini.config.ConfigException
+import io.github.lxptechnologies.lxpmini.config.ConfigLoader
+import io.github.lxptechnologies.lxpmini.model.ParameterCounter
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
 import java.nio.file.Path

@@ -1,4 +1,4 @@
-package dev.lxpmini.config
+package io.github.lxptechnologies.lxpmini.config
 
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
