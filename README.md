@@ -2,6 +2,16 @@
 
 Petit modèle de langage decoder-only construit progressivement from scratch en Kotlin/JVM. Chaque PR introduit un concept exécutable, testé et documenté.
 
+## PR06 - Observer l'attention causale
+
+Exécute une attention multi-tête sur quatre tokens et imprime la matrice de probabilités d'une tête :
+
+```powershell
+.\gradlew.bat run --args="model attention --d-model 8 --num-heads 2 --sequence-length 4 --context-length 16 --seed 42"
+```
+
+La commande vérifie également que chaque ligne somme à 1, que la probabilité du futur vaut 0 et que modifier le dernier token ne change aucune sortie passée. Consulte la [note de laboratoire PR06](docs/lab-notes/pr-06-causal-self-attention.md) pour refaire les expériences.
+
 ## PR05 - Observer embeddings, RMSNorm et RoPE
 
 PR05 introduit DJL/PyTorch et les premiers tenseurs entraînables :

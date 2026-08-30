@@ -96,7 +96,7 @@ Un objet Kotlin peut devenir inaccessible sans que sa mémoire native soit immé
 ## Limites de PR05
 
 - Les composants sont isolés; aucun bloc Transformer n'existe encore.
-- RoPE est appliqué à une représentation de démonstration; PR06 l'appliquera réellement à `Q` et `K`.
+- La commande PR05 applique RoPE à une représentation de démonstration; la [self-attention de PR06](06-causal-self-attention.md) l'applique réellement à `Q` et `K`.
 - Le chemin validé automatiquement est CPU FP32.
 - Mixed precision, GPU et initialisation complète sont reportés après une référence correcte.
 

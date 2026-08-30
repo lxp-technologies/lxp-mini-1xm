@@ -16,6 +16,9 @@ Ce dossier accompagne le code dans l'ordre où les concepts sont construits. Ne 
 10. [Embeddings, RMSNorm et RoPE](05-embeddings-rmsnorm-rope.md)
 11. [Gestion de la mémoire native DJL](architecture/djl-memory-management.md)
 12. [PR05 : premiers tenseurs et gradients](lab-notes/pr-05-embeddings-rmsnorm-rope.md)
-13. [Plan complet des PR](plan-directeur.md)
+13. [Self-attention causale](06-causal-self-attention.md)
+14. [ADR : attention multi-tête causale standard](architecture/decisions/0001-standard-causal-mha.md)
+15. [PR06 : inspecter et prouver la causalité](lab-notes/pr-06-causal-self-attention.md)
+16. [Plan complet des PR](plan-directeur.md)
 
-Les chapitres sur les données, tenseurs, attention et entraînement seront ajoutés avec leur implémentation. Un document ne prétendra jamais qu'un composant fonctionne avant que sa PR fournisse les tests correspondants.
+Les prochains chapitres seront ajoutés avec leur implémentation. Un document ne prétendra jamais qu'un composant fonctionne avant que sa PR fournisse les tests correspondants.

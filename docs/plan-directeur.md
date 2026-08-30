@@ -1,8 +1,8 @@
 # Plan directeur de `lxp-mini-1xm`
 
-> Statut : PR01 à PR04 terminées; PR05 implémentée sur `feature/pr05-embeddings-rmsnorm-rope`
+> Statut : PR01 à PR05 terminées; PR06 implémentée sur `feature/pr06-causal-self-attention`
 > Source de vérité initiale : [`docs2/project.md`](../docs2/project.md)  
-> Dernière mise à jour : 2026-08-29
+> Dernière mise à jour : 2026-08-30
 
 ## 1. Intention du projet
 
@@ -363,6 +363,8 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 ### PR06 - Self-attention causale
 
 **Construire :** Q/K/V, séparation/fusion des têtes, score mis à l'échelle, masque causal, softmax et projection de sortie.
+
+**Commande exécutable :** `model attention` imprime une matrice de quatre tokens, ses sommes de lignes, la plus grande probabilité future et le résultat d'une expérience anti-fuite.
 
 **Tests :** chaque forme, somme des probabilités, masque triangulaire et test anti-fuite où modifier un token futur ne change aucun état passé.
 
