@@ -13,7 +13,7 @@ flowchart LR
 ## Frontières
 
 - `config` charge et valide les expériences sans dépendre d'une bibliothèque neuronale.
-- `model` contient le compteur théorique et les primitives différentiables. PR05 ajoute embedding, RMSNorm et RoPE; PR06 ajoute la self-attention causale; PR07 assemble SwiGLU et le premier bloc Transformer pre-norm.
+- `model` contient le compteur théorique et les primitives différentiables. PR05 ajoute embedding, RMSNorm et RoPE; PR06 ajoute l'attention; PR07 assemble un bloc; PR08 construit le decoder complet et ses logits.
 - `cli` rend chaque concept exécutable depuis Gradle.
 - `tokenizer` et `data` préparent les `IntArray`; `model` les convertira progressivement en calcul neuronal DJL.
 - les futurs packages `training`, `generation` et `evaluation` apparaîtront seulement dans leur PR.
@@ -27,14 +27,16 @@ flowchart LR
 - JDK 25, Gradle 9.1+ et Kotlin/JVM;
 - aucune dépendance DJL n'a été ajoutée avant le premier tenseur en PR05; le code du modèle dépend de l'API DJL et non des classes internes PyTorch.
 
-## État après PR07
+## État après PR08
 
 ```mermaid
 flowchart LR
-    X[États<br/>B x T x C] --> BLOCK[TransformerBlock<br/>pre-norm]
-    BLOCK --> ATT[CausalSelfAttention]
-    BLOCK --> FFN[SwiGluFeedForward]
-    BLOCK --> Y[Sortie<br/>B x T x C]
+    IDS[IDs<br/>B x T] --> EMB[TokenEmbedding]
+    EMB --> BLOCKS[N TransformerBlock]
+    BLOCKS --> NORM[RMSNorm final]
+    NORM --> HEAD[LanguageModelHead]
+    HEAD --> LOGITS[Logits<br/>B x T x V]
+    EMB -. même poids .-> HEAD
 ```
 
-Le bloc isolé est complet, mais le modèle ne répète pas encore `N` blocs et ne produit aucun logit. Embeddings, pile de blocs, norme finale et LM head seront assemblés en PR08.
+Le forward neuronal complet existe. La cross-entropy next-token, l'optimizer et la boucle d'entraînement arrivent en PR09; les logits ne sont donc pas encore convertis en loss dans PR08.

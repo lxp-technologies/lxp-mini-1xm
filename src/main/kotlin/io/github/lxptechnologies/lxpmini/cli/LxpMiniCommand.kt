@@ -28,6 +28,7 @@ class LxpMiniCommand : Runnable {
         ModelComponentsCommand::class,
         ModelAttentionCommand::class,
         ModelBlockCommand::class,
+        ModelForwardCommand::class,
     ],
 )
 class ModelCommand : Runnable {

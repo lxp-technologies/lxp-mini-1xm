@@ -23,6 +23,8 @@ Les quatre matrices d'attention sont `Wq`, `Wk`, `Wv` et `Wo`. Les trois matrice
 
 `contextLength` change le nombre d'activations et le coût de l'attention. `numHeads` découpe `C` en plusieurs têtes sans changer la taille totale des quatre matrices `[C,C]`. Ces valeurs influencent donc calcul et mémoire, pas le nombre de poids pour l'architecture retenue.
 
-## Preuve actuelle et preuve future
+## Double preuve depuis PR08
 
-PR01 teste la formule pure. En PR08, nous compterons les paramètres réellement créés par DJL et exigerons l'égalité avec cette estimation.
+PR01 teste la formule pure. PR08 initialise le modèle DJL, additionne la taille de chaque `Parameter` enregistré et exige la même valeur : `17 308 032`. Le modèle lié possède 74 tenseurs de paramètres.
+
+Avec `--untie-embeddings`, le head enregistre une matrice indépendante `[C,V]`. Le modèle possède alors 75 tenseurs et `20 453 760` poids. La différence de `3 145 728` vaut exactement `V×C`.

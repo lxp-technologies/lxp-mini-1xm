@@ -28,7 +28,7 @@ nombre de paramètres        V × C
 
 Le lookup est une indexation, pas une multiplication one-hot. Une représentation one-hot intermédiaire `[B,T,V]` gaspillerait beaucoup de mémoire. Lors du backward, seules les lignes utilisées reçoivent un gradient; si un ID apparaît deux fois, ses contributions s'additionnent.
 
-Les poids sont initialisés par une normale d'écart-type `0,02`. Cette convention est un point de départ; l'initialisation complète du Transformer sera décidée avec le modèle en PR08.
+Les poids sont initialisés par une normale d'écart-type `0,02`. PR08 conserve cette convention pour embeddings et head indépendant, utilise Xavier pour les projections et consigne la décision complète dans [ADR 0003](architecture/decisions/0003-weight-tying-and-initialization.md).
 
 ## RMSNorm
 

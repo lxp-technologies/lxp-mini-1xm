@@ -2,6 +2,16 @@
 
 Petit modèle de langage decoder-only construit progressivement from scratch en Kotlin/JVM. Chaque PR introduit un concept exécutable, testé et documenté.
 
+## PR08 - Exécuter le modèle decoder-only complet
+
+Instancie réellement les 17,3 M paramètres et produit des logits `[B,T,V]` :
+
+```powershell
+.\gradlew.bat run --args="model forward --config configs/mini-17m.yaml --batch-size 1 --sequence-length 4 --seed 42"
+```
+
+Ajoute `--untie-embeddings` pour mesurer la seconde matrice du LM head. La commande vérifie le partage par identité d'objet et compare le compte réel au [compteur théorique](docs/architecture/parameter-counting.md). Consulte la [note de laboratoire PR08](docs/lab-notes/pr-08-decoder-language-model.md).
+
 ## PR07 - Observer un bloc Transformer complet
 
 Exécute un bloc pre-norm isolé avec attention causale, SwiGLU et deux connexions résiduelles :
