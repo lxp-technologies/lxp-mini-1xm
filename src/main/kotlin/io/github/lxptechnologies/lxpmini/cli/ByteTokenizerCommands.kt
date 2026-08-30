@@ -16,7 +16,7 @@ import java.util.concurrent.Callable
 @Command(
     name = "tokenizer",
     description = ["Inspect and create tokenizers."],
-    subcommands = [ByteTokenizerCommand::class],
+    subcommands = [ByteTokenizerCommand::class, BpeTokenizerCommand::class],
 )
 class TokenizerCommand : Runnable {
     override fun run() {
@@ -48,7 +48,7 @@ class ByteTokenizerInspectCommand(
         multiplicity = "1",
         heading = "Input (choose one):%n",
     )
-    lateinit var input: ByteTokenizerTextInput
+    lateinit var input: TokenizerTextInput
 
     @Option(names = ["--add-bos"], description = ["Add the beginning-of-sequence token."])
     var addBos: Boolean = false
@@ -80,7 +80,7 @@ class ByteTokenizerInspectCommand(
     }
 }
 
-class ByteTokenizerTextInput {
+class TokenizerTextInput {
     @Option(names = ["--text"], description = ["Text supplied directly on the command line."])
     var text: String? = null
 
@@ -121,11 +121,11 @@ class ByteTokenizerCreateCommand(
     }
 }
 
-private fun ByteArray.toUnsignedDisplay(): String = joinToString(prefix = "[", postfix = "]") {
+internal fun ByteArray.toUnsignedDisplay(): String = joinToString(prefix = "[", postfix = "]") {
     (it.toInt() and 0xFF).toString()
 }
 
-private fun String.visibleWhitespace(): String = buildString {
+internal fun String.visibleWhitespace(): String = buildString {
     this@visibleWhitespace.forEach { character ->
         append(
             when (character) {
