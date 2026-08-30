@@ -1,6 +1,6 @@
 # Plan directeur de `lxp-mini-1xm`
 
-> Statut : PR01 à PR07 terminées; PR08 implémentée sur `feature/pr08-decoder-language-model`
+> Statut : PR01 à PR08 terminées; PR09 implémentée sur `feature/pr09-loss-training-loop`
 > Source de vérité initiale : [`docs2/project.md`](../docs2/project.md)  
 > Dernière mise à jour : 2026-08-30
 
@@ -504,13 +504,12 @@ Le tokenizer doit être entraîné sur le corpus d'entraînement seulement. Util
 ### 9.4 Exécuter les sanity checks après PR09
 
 ```powershell
-./gradlew.bat test
-./gradlew.bat run --args="train sanity-forward --config configs/tiny.yaml"
-./gradlew.bat run --args="train overfit-batch --config configs/tiny.yaml --train data/prepared/train.txt --tokenizer artifacts/tokenizer/tokenizer.json"
-./gradlew.bat run --args="train --config configs/tiny.yaml --tokenizer artifacts/tokenizer/tokenizer.json --train data/prepared/train.txt --validation data/prepared/validation.txt --output runs/tiny-corpus-v1"
+.\gradlew.bat test
+.\gradlew.bat run --args="model forward --config configs/lab-pr09-tiny.yaml --batch-size 2 --sequence-length 8 --seed 42"
+.\gradlew.bat run --args="train overfit-batch --config configs/lab-pr09-tiny.yaml --updates 80 --report-every 10"
 ```
 
-Les noms précis des deux commandes de sanity check seront validés en PR09. Leurs invariants ne sont pas négociables : formes correctes et finies, loss d'un batch qui chute fortement, puis structure du tiny corpus qui commence à être apprise.
+Ces deux sanity checks sont disponibles depuis PR09. Le premier vérifie formes et valeurs finies; le second doit faire chuter fortement la loss d'un lot synthétique. L'entraînement d'un corpus et sa validation ne sont pas encore exposés : checkpoints en PR10, génération en PR11, puis pipeline de corpus et évaluation en PR12.
 
 ### 9.5 Lancer `mini-17m` après PR12
 

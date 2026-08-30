@@ -2,6 +2,16 @@
 
 Petit modèle de langage decoder-only construit progressivement from scratch en Kotlin/JVM. Chaque PR introduit un concept exécutable, testé et documenté.
 
+## PR09 - Observer un modèle qui apprend
+
+Répète un lot synthétique sur un tiny model et affiche cross-entropy, learning rate, norme globale des gradients, clipping et tokens vus :
+
+```powershell
+.\gradlew.bat run --args="train overfit-batch --config configs/lab-pr09-tiny.yaml --updates 80 --report-every 10"
+```
+
+La loss de référence chute d'environ `5.56` à moins de `0.001`. Ce sanity check valide backward, accumulation, AdamW et warmup/cosine avant tout long entraînement. Consulte le [chapitre PR09](docs/09-loss-and-training-loop.md) et la [note de laboratoire](docs/lab-notes/pr-09-single-batch-overfit.md).
+
 ## PR08 - Exécuter le modèle decoder-only complet
 
 Instancie réellement les 17,3 M paramètres et produit des logits `[B,T,V]` :

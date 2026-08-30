@@ -95,7 +95,7 @@ Chaque bloc possède son cache RoPE. Un modèle de huit blocs ouvre donc huit so
 
 Les poids FP32 de `mini-17m` occupent seuls environ `69,2 MB` décimaux. Un entraînement demandera davantage pour gradients, activations et états AdamW.
 
-## Limites de PR08
+## Limites à la sortie de PR08
 
 - Les logits ne sont reliés à aucune cible et aucune loss n'est calculée.
 - Aucun optimizer ni step d'entraînement n'existe encore.
@@ -103,4 +103,4 @@ Les poids FP32 de `mini-17m` occupent seuls environ `69,2 MB` décimaux. Un entr
 - Dropout doit rester à `0.0` et mixed precision est reporté.
 - Le forward de référence ne possède pas de KV cache de génération.
 
-La décision de partage est détaillée dans [ADR 0003](architecture/decisions/0003-weight-tying-and-initialization.md). Les commandes reproductibles sont dans la [note de laboratoire PR08](lab-notes/pr-08-decoder-language-model.md).
+Ces deux premières limites sont maintenant levées par [PR09](09-loss-and-training-loop.md), qui ajoute loss et optimizer sans modifier le contrat du forward. La décision de partage est détaillée dans [ADR 0003](architecture/decisions/0003-weight-tying-and-initialization.md). Les commandes reproductibles sont dans la [note de laboratoire PR08](lab-notes/pr-08-decoder-language-model.md).
