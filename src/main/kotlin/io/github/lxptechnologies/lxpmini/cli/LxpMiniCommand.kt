@@ -23,7 +23,12 @@ class LxpMiniCommand : Runnable {
 @Command(
     name = "model",
     description = ["Inspect model configurations."],
-    subcommands = [ModelInfoCommand::class, ModelComponentsCommand::class, ModelAttentionCommand::class],
+    subcommands = [
+        ModelInfoCommand::class,
+        ModelComponentsCommand::class,
+        ModelAttentionCommand::class,
+        ModelBlockCommand::class,
+    ],
 )
 class ModelCommand : Runnable {
     override fun run() {

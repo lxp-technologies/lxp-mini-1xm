@@ -2,6 +2,16 @@
 
 Petit modèle de langage decoder-only construit progressivement from scratch en Kotlin/JVM. Chaque PR introduit un concept exécutable, testé et documenté.
 
+## PR07 - Observer un bloc Transformer complet
+
+Exécute un bloc pre-norm isolé avec attention causale, SwiGLU et deux connexions résiduelles :
+
+```powershell
+.\gradlew.bat run --args="model block --d-model 8 --num-heads 2 --ffn-dim 16 --sequence-length 4 --context-length 16 --seed 42"
+```
+
+La commande affiche toutes les formes, les `656` paramètres du bloc miniature, la causalité conservée et compare les gradients avec et sans résidus. Consulte la [note de laboratoire PR07](docs/lab-notes/pr-07-transformer-block.md).
+
 ## PR06 - Observer l'attention causale
 
 Exécute une attention multi-tête sur quatre tokens et imprime la matrice de probabilités d'une tête :
