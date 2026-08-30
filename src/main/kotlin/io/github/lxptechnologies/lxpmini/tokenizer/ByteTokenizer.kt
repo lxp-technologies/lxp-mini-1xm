@@ -1,7 +1,5 @@
 package io.github.lxptechnologies.lxpmini.tokenizer
 
-import java.nio.ByteBuffer
-import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
 
 class ByteTokenizer : Tokenizer {
@@ -32,16 +30,7 @@ class ByteTokenizer : Tokenizer {
     }
 
     override fun decode(tokenIds: IntArray, skipSpecialTokens: Boolean): String {
-        val bytes = decodeToBytes(tokenIds, skipSpecialTokens)
-        val decoder = StandardCharsets.UTF_8.newDecoder()
-            .onMalformedInput(CodingErrorAction.REPORT)
-            .onUnmappableCharacter(CodingErrorAction.REPORT)
-
-        return try {
-            decoder.decode(ByteBuffer.wrap(bytes)).toString()
-        } catch (exception: java.nio.charset.CharacterCodingException) {
-            throw TokenizerException("Token IDs do not form valid UTF-8", exception)
-        }
+        return Utf8Codec.decode(decodeToBytes(tokenIds, skipSpecialTokens))
     }
 
     fun decodeToBytes(tokenIds: IntArray, skipSpecialTokens: Boolean = true): ByteArray {

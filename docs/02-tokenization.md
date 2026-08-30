@@ -1,4 +1,4 @@
-# Tokenization : des caractères aux bytes
+# Tokenization : des caractères aux pièces BPE
 
 ## Qu'est-ce que c'est?
 
@@ -104,3 +104,46 @@ Le test des 256 valeurs est la preuve essentielle qu'aucun byte inconnu ne peut 
 ## Expérience à faire
 
 Suis la [note de laboratoire PR02](lab-notes/pr-02-byte-tokenizer.md). Elle montre comment inspecter plusieurs écritures, ajouter les tokens spéciaux, créer l'artefact JSON et exécuter uniquement les tests du tokenizer.
+
+## PR03 : que change le byte-level BPE?
+
+Le BPE ne remplace pas la couverture universelle de PR02. Il commence avec exactement les mêmes 259 IDs, puis apprend des tokens supplémentaires en fusionnant les paires adjacentes les plus fréquentes du corpus d'entraînement.
+
+```mermaid
+flowchart LR
+    C[Corpus UTF-8] --> B[IDs de bytes]
+    B --> P[Compter les paires adjacentes]
+    P --> S[Choisir la paire la plus fréquente]
+    S --> M[Créer un nouvel ID et fusionner]
+    M -->|vocabulaire cible non atteint| P
+    M -->|cible atteinte| J[tokenizer.json]
+    J --> E[Encodeur qui rejoue les merges dans l'ordre]
+```
+
+Avec le texte `abab`, les IDs initiaux de `a` et `b` sont 100 et 101. Le premier merge devient `(100, 101) -> 259`, soit la pièce `ab`. Après remplacement, `[100, 101, 100, 101]` devient `[259, 259]`; le merge suivant peut donc créer `(259, 259) -> 260`, soit `abab`.
+
+### Pourquoi choisir la paire la plus fréquente?
+
+Une paire fréquente remplacée par un seul ID réduit souvent la longueur des séquences. Des séquences plus courtes diminuent le nombre de positions traitées par le futur Transformer. Le choix est toutefois local et glouton : BPE optimise la compression des motifs observés, pas directement la compréhension du langage.
+
+### Pourquoi imposer un départage déterministe?
+
+Plusieurs paires ont souvent la même fréquence. Nous choisissons alors la plus petite paire selon `(leftId, rightId)`. Le parcours d'une `HashMap` ne peut donc pas modifier le résultat : mêmes bytes et même taille cible produisent les mêmes merges et le même checksum de corpus.
+
+### Pourquoi les remplacements ne se chevauchent-ils pas?
+
+Pour `aaa`, la paire `aa` apparaît à deux positions qui partagent le byte central. Un token ne peut participer qu'à une fusion durant un passage. Le remplacement gauche-vers-droite produit donc `[aa, a]`, jamais deux pièces `aa` qui réutiliseraient le même byte.
+
+### Pourquoi l'ordre des merges fait-il partie du modèle?
+
+Un merge récent peut référencer un token créé par un merge précédent. À l'encodage, il faut donc rejouer les règles dans leur ordre d'apprentissage. Trier les règles par fréquence ou par ID après l'entraînement changerait la tokenization.
+
+### Que contient l'artefact?
+
+`tokenizer.json` enregistre explicitement la version, les tokens spéciaux, les bytes de chaque entrée, les merges ordonnés, leur fréquence d'apprentissage, la taille du corpus et son SHA-256. Le chargement refuse les champs inconnus, les IDs non contigus et les pièces incompatibles avec leurs merges. Un checkpoint futur devra conserver exactement cet artefact.
+
+### Quel est le coût de cette implémentation?
+
+Le trainer de PR03 privilégie la lisibilité : il conserve le corpus tokenisé en mémoire et recompte toutes les paires après chaque merge. Pour `N` tokens et `M = vocabSize - 259` merges, son ordre de grandeur est `O(M × N)` en temps et `O(N)` en mémoire. C'est adapté au laboratoire et à des corpus modestes, mais il faudra mesurer puis optimiser les comptes incrémentaux avant un très gros corpus.
+
+Suis la [note de laboratoire PR03](lab-notes/pr-03-byte-level-bpe.md) pour entraîner un artefact, inspecter ses pièces et comparer le nombre de bytes par token.
