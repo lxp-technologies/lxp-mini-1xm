@@ -11,16 +11,14 @@ class BpeTokenizer(
     val merges: List<BpeMerge> = merges.toList()
 
     override val vocabularySize: Int = this.vocabulary.size
+    val maximumTokenByteLength: Int = this.vocabulary.values.maxOf(ByteArray::size)
 
     init {
         validateModel()
     }
 
     override fun encode(text: String, addBos: Boolean, addEos: Boolean): IntArray {
-        var tokenIds = text.toByteArray(StandardCharsets.UTF_8).toByteTokenIds()
-        merges.forEach { merge ->
-            tokenIds = applyMerge(tokenIds, merge)
-        }
+        val tokenIds = encodeBytes(text.toByteArray(StandardCharsets.UTF_8))
 
         if (!addBos && !addEos) return tokenIds
 
@@ -31,6 +29,14 @@ class BpeTokenizer(
         outputIndex += tokenIds.size
         if (addEos) withSpecialTokens[outputIndex] = SpecialToken.EOS.id
         return withSpecialTokens
+    }
+
+    fun encodeBytes(bytes: ByteArray): IntArray {
+        var tokenIds = bytes.toByteTokenIds()
+        merges.forEach { merge ->
+            tokenIds = applyMerge(tokenIds, merge)
+        }
+        return tokenIds
     }
 
     override fun decode(tokenIds: IntArray, skipSpecialTokens: Boolean): String {

@@ -36,6 +36,6 @@ build/
 out/
 
 # Local datasets and generated model artifacts
-data/
-artifacts/
-runs/
+/data/
+/artifacts/
+/runs/
