@@ -250,17 +250,17 @@ Donc `headDim = 384 / 6 = 64`.
 
 ### 6.2 Calcul
 
-| Composant | Formule | Paramètres |
-|---|---:|---:|
-| Token embeddings | `V × C` | 3 145 728 |
-| Attention d'un bloc | `4 × C²` | 589 824 |
-| SwiGLU d'un bloc | `3 × C × F` | 1 179 648 |
-| Deux RMSNorm d'un bloc | `2 × C` | 768 |
-| Un bloc | somme précédente | 1 770 240 |
-| Huit blocs | `8 × 1 770 240` | 14 161 920 |
-| RMSNorm final | `C` | 384 |
-| LM head | partagé avec embeddings | 0 additionnel |
-| **Total** | `V×C + N×(4C² + 3CF + 2C) + C` | **17 308 032** |
+| Composant              |                        Formule |      Paramètres |
+|------------------------|-------------------------------:|----------------:|
+| Token embeddings       |                        `V × C` |       3 145 728 |
+| Attention d'un bloc    |                       `4 × C²` |         589 824 |
+| SwiGLU d'un bloc       |                    `3 × C × F` |       1 179 648 |
+| Deux RMSNorm d'un bloc |                        `2 × C` |             768 |
+| Un bloc                |               somme précédente |       1 770 240 |
+| Huit blocs             |                `8 × 1 770 240` |      14 161 920 |
+| RMSNorm final          |                            `C` |             384 |
+| LM head                |        partagé avec embeddings |   0 additionnel |
+| **Total**              | `V×C + N×(4C² + 3CF + 2C) + C` |  **17 308 032** |
 
 Le contexte de 256 tokens et les 6 têtes modifient le calcul et la mémoire d'exécution, mais pas le nombre de poids dans cette architecture. En revanche, augmenter `vocabSize`, `dModel`, `ffnDim` ou `numLayers` augmente directement les paramètres.
 
@@ -270,35 +270,35 @@ Si le partage de poids est désactivé, le LM head ajoute `C × V = 3 145 728` p
 
 ### 7.1 Décidées maintenant
 
-| Décision | Raison | Conséquence |
-|---|---|---|
-| Decoder-only autoregressif | architecture minimale adaptée à la génération | apprend uniquement le prochain token |
-| Byte-level BPE maison | aucun caractère UTF-8 inconnu et mécanisme observable | trainer plus lent qu'une implémentation native |
-| RoPE | position sans grande table apprise | rotation explicite de Q et K à tester |
-| Pre-norm + RMSNorm | architecture moderne et simple | deux normalisations par bloc |
-| Attention multi-head standard | meilleure valeur pédagogique | coût quadratique en `T` |
-| SwiGLU | FFN moderne, mécanisme encore lisible | trois matrices par FFN |
-| Projections sans biais | simplicité et compte exact de 17 308 032 | hypothèse à protéger par test |
-| Weight tying par défaut | économise 3 145 728 paramètres | embedding et head doivent partager le même poids réel |
-| Configuration YAML stricte | expériences sans modifier le code | clés inconnues et valeurs invalides échouent tôt |
-| Mono-module Gradle | limite la structure accidentelle | réévaluer seulement si les frontières deviennent pénibles |
-| FP32 comme référence de correction | résultats numériques faciles à comprendre | mixed precision vient seulement après profilage |
+| Décision                           | Raison                                                | Conséquence                                               |
+|------------------------------------|-------------------------------------------------------|-----------------------------------------------------------|
+| Decoder-only autoregressif         | architecture minimale adaptée à la génération         | apprend uniquement le prochain token                      |
+| Byte-level BPE maison              | aucun caractère UTF-8 inconnu et mécanisme observable | trainer plus lent qu'une implémentation native            |
+| RoPE                               | position sans grande table apprise                    | rotation explicite de Q et K à tester                     |
+| Pre-norm + RMSNorm                 | architecture moderne et simple                        | deux normalisations par bloc                              |
+| Attention multi-head standard      | meilleure valeur pédagogique                          | coût quadratique en `T`                                   |
+| SwiGLU                             | FFN moderne, mécanisme encore lisible                 | trois matrices par FFN                                    |
+| Projections sans biais             | simplicité et compte exact de 17 308 032              | hypothèse à protéger par test                             |
+| Weight tying par défaut            | économise 3 145 728 paramètres                        | embedding et head doivent partager le même poids réel     |
+| Configuration YAML stricte         | expériences sans modifier le code                     | clés inconnues et valeurs invalides échouent tôt          |
+| Mono-module Gradle                 | limite la structure accidentelle                      | réévaluer seulement si les frontières deviennent pénibles |
+| FP32 comme référence de correction | résultats numériques faciles à comprendre             | mixed precision vient seulement après profilage           |
 
 Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decisions/` au moment de son implémentation.
 
 ### 7.2 Volontairement reportées
 
-| Question | Quand décider | Preuve nécessaire |
-|---|---:|---|
-| Mise à niveau Kotlin/Jackson/Picocli | PR future dédiée | compatibilité, notes de version et build JDK 25 verts |
-| Format JSON exact du tokenizer BPE | PR03 | round-trip, merges et compatibilité de version |
-| Stratégie de lecture des gros corpus | PR04 | mesure mémoire et débit |
-| Initialisation des poids | PR05/PR08 | absence de NaN et single-batch overfit |
-| API DJL de weight tying | PR08 | test d'identité/partage réel du paramètre |
-| Restaurabilité complète d'AdamW | PR10 | test checkpoint + reprise exacte |
-| FP16/BF16 | après PR12 | gain mesuré, stabilité démontrée |
-| Dataset principal et langue | avant le premier long run | licence, qualité, taille et objectif linguistique |
-| Budget final de tokens | PR12 | courbes de validation et budget matériel |
+| Question                             |             Quand décider | Preuve nécessaire                                     |
+|--------------------------------------|--------------------------:|-------------------------------------------------------|
+| Mise à niveau Kotlin/Jackson/Picocli |          PR future dédiée | compatibilité, notes de version et build JDK 25 verts |
+| Format JSON exact du tokenizer BPE   |                      PR03 | round-trip, merges et compatibilité de version        |
+| Stratégie de lecture des gros corpus |                      PR04 | mesure mémoire et débit                               |
+| Initialisation des poids             |                 PR05/PR08 | absence de NaN et single-batch overfit                |
+| API DJL de weight tying              |                      PR08 | test d'identité/partage réel du paramètre             |
+| Restaurabilité complète d'AdamW      |                      PR10 | test checkpoint + reprise exacte                      |
+| FP16/BF16                            |                après PR12 | gain mesuré, stabilité démontrée                      |
+| Dataset principal et langue          | avant le premier long run | licence, qualité, taille et objectif linguistique     |
+| Budget final de tokens               |                      PR12 | courbes de validation et budget matériel              |
 
 ## 8. Plan des PR
 
