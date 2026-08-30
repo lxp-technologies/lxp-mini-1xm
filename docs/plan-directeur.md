@@ -1,6 +1,6 @@
 # Plan directeur de `lxp-mini-1xm`
 
-> Statut : plan accepté; PR01 implémentée sur `feature/pr01-project-foundation`
+> Statut : PR01 terminée; PR02 implémentée sur `feature/pr02-byte-tokenizer`
 > Source de vérité initiale : [`docs2/project.md`](../docs2/project.md)  
 > Dernière mise à jour : 2026-08-29
 
@@ -291,7 +291,7 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 | Question | Quand décider | Preuve nécessaire |
 |---|---:|---|
 | Mise à niveau Kotlin/Jackson/Picocli | PR future dédiée | compatibilité, notes de version et build JDK 25 verts |
-| Format JSON exact du tokenizer | PR03 | round-trip et compatibilité de version |
+| Format JSON exact du tokenizer BPE | PR03 | round-trip, merges et compatibilité de version |
 | Stratégie de lecture des gros corpus | PR04 | mesure mémoire et débit |
 | Initialisation des poids | PR05/PR08 | absence de NaN et single-batch overfit |
 | API DJL de weight tying | PR08 | test d'identité/partage réel du paramètre |
@@ -315,6 +315,8 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 ### PR02 - Byte tokenizer UTF-8
 
 **Construire :** interface de tokenizer, représentation des 256 bytes, BOS/EOS/PAD, encode/decode et sérialisation versionnée.
+
+**Commandes exécutables :** `tokenizer byte inspect` rend visibles texte, bytes et IDs; `tokenizer byte create` écrit l'artefact JSON versionné.
 
 **Tests :** round-trip ASCII, français, emoji, Unicode, espaces, retours à la ligne et texte vide.
 
