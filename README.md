@@ -7,11 +7,12 @@ Petit modèle de langage decoder-only construit progressivement from scratch en 
 Interrompt un tiny run, recrée le modèle, prouve des logits identiques et poursuit avec les limites de reprise affichées :
 
 ```powershell
-.\gradlew.bat run --args="train checkpoint-demo --config configs/lab-pr09-tiny.yaml --run-dir build/labs/pr10/demo-001 --before-updates 10 --after-updates 5"
-.\gradlew.bat run --args="train checkpoint-verify --run-dir build/labs/pr10/demo-001"
+$runDir = "build/labs/pr10/demo-$(Get-Date -Format yyyyMMdd-HHmmss)"
+.\gradlew.bat run --args="train checkpoint-demo --config configs/lab-pr09-tiny.yaml --run-dir $runDir --before-updates 10 --after-updates 5"
+.\gradlew.bat run --args="train checkpoint-verify --run-dir $runDir"
 ```
 
-Les poids, compteurs et scheduler sont restaurés; les moments AdamW et l'état aléatoire ne le sont pas, donc `exactTrainingResume=false`. Consulte le [chapitre PR10](docs/10-checkpoints-and-reproducible-runs.md) et la [note de laboratoire](docs/lab-notes/pr-10-checkpoint-round-trip.md).
+Chaque exécution doit utiliser un nouveau dossier : PR10 refuse volontairement d'écraser un run existant. Les poids, compteurs et scheduler sont restaurés; les moments AdamW et l'état aléatoire ne le sont pas, donc `exactTrainingResume=false`. Consulte le [chapitre PR10](docs/10-checkpoints-and-reproducible-runs.md) et la [note de laboratoire](docs/lab-notes/pr-10-checkpoint-round-trip.md).
 
 ## PR09 - Observer un modèle qui apprend
 
