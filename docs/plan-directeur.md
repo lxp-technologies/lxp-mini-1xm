@@ -1,6 +1,6 @@
 # Plan directeur de `lxp-mini-1xm`
 
-> Statut : PR01 à PR09 terminées; PR10 implémentée sur `feature/pr10-checkpoints-reproducible-runs`
+> Statut : PR01 à PR10 terminées; PR11 implémentée sur `feature/pr11-generation-sampling`
 > Source de vérité initiale : [`docs2/project.md`](../docs2/project.md)  
 > Dernière mise à jour : 2026-08-30
 
@@ -552,18 +552,16 @@ runs/mini-17m-v1/
 
 Surveiller au minimum : step, tokens vus, train loss, validation loss, learning rate, gradient norm, tokens/s, temps écoulé et mémoire. Arrêter sur loss/gradient non fini. Une train loss qui baisse avec une validation loss qui remonte indique probablement du surapprentissage.
 
-Les deux commandes suivantes décrivent toujours l'interface cible après PR11-PR12; elles ne sont pas encore disponibles en PR10 :
+La reprise générale d'un entraînement de corpus reste une interface cible de PR12 :
 
 ```powershell
 ./gradlew.bat run --args="train --resume runs/mini-17m-v1/checkpoints/latest"
-./gradlew.bat run --args="generate --checkpoint runs/mini-17m-v1/checkpoints/latest --prompt 'Once upon a time' --max-new-tokens 128 --temperature 0.8 --top-k 40 --top-p 0.95"
 ```
 
-Depuis PR10, le laboratoire de checkpoint exécutable est :
+Depuis PR11, la génération à partir d'un run PR10 et d'un tokenizer compatible est disponible :
 
 ```powershell
-.\gradlew.bat run --args="train checkpoint-demo --config configs/lab-pr09-tiny.yaml --run-dir build/labs/pr10/demo-001 --before-updates 10 --after-updates 5"
-.\gradlew.bat run --args="train checkpoint-verify --run-dir build/labs/pr10/demo-001"
+.\gradlew.bat run --args="generate --run-dir build/labs/pr11/demo-001 --tokenizer build/labs/pr11/tokenizer.json --prompt abc --max-new-tokens 12 --strategy sample --temperature 0.8 --top-k 40 --top-p 0.95 --seed 42"
 ```
 
 Cette reprise restaure les poids, le compteur, les tokens vus et le scheduler, mais pas les moments AdamW ni l'état RNG. Elle porte donc explicitement `exactTrainingResume=false`. La future commande générale `train --resume` ne devra être annoncée exacte que si poids, moments AdamW, scheduler, step et états aléatoires sont tous restaurés.

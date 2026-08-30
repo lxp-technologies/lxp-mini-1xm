@@ -31,6 +31,9 @@ Ce dossier accompagne le code dans l'ordre où les concepts sont construits. Ne 
 25. [Checkpoints et runs reproductibles](10-checkpoints-and-reproducible-runs.md)
 26. [ADR : checkpoint versionné et reprise limitée](architecture/decisions/0005-versioned-weights-checkpoint.md)
 27. [PR10 : interrompre et restaurer un tiny run](lab-notes/pr-10-checkpoint-round-trip.md)
-28. [Plan complet des PR](plan-directeur.md)
+28. [Génération autorégressive et sampling](11-generation-and-sampling.md)
+29. [ADR : sampling explicite et fenêtre glissante](architecture/decisions/0006-explicit-sampling-sliding-window.md)
+30. [PR11 : suivre les logits jusqu'au texte](lab-notes/pr-11-generation-and-sampling.md)
+31. [Plan complet des PR](plan-directeur.md)
 
 Les prochains chapitres seront ajoutés avec leur implémentation. Un document ne prétendra jamais qu'un composant fonctionne avant que sa PR fournisse les tests correspondants.

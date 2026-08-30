@@ -143,8 +143,8 @@ Non. Un attaquant pouvant remplacer les poids et le manifeste peut recalculer le
 
 ### Puis-je utiliser le checkpoint pour PR11?
 
-Oui pour recréer les poids et obtenir les mêmes logits. PR11 devra ajouter tokenizer et sampling, mais n'a pas besoin des moments AdamW pour l'inférence.
+Oui. PR11 recharge ces poids avec `generate`; il faut lui fournir le byte tokenizer séparé. Les moments AdamW ne sont pas requis pour l'inférence.
 
 ## Prochaine étape
 
-PR11 chargera un checkpoint vérifié, choisira les prochains IDs avec greedy, température, top-k et top-p, puis les décodera en texte.
+Exécuter maintenant le [laboratoire PR11](pr-11-generation-and-sampling.md) pour choisir les prochains IDs avec greedy, température, top-k et top-p, puis les décoder en texte.
