@@ -1,6 +1,6 @@
 # Plan directeur de `lxp-mini-1xm`
 
-> Statut : PR01 à PR05 terminées; PR06 implémentée sur `feature/pr06-causal-self-attention`
+> Statut : PR01 à PR06 terminées; PR07 implémentée sur `feature/pr07-transformer-block`
 > Source de vérité initiale : [`docs2/project.md`](../docs2/project.md)  
 > Dernière mise à jour : 2026-08-30
 
@@ -375,6 +375,8 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 ### PR07 - SwiGLU et bloc Transformer
 
 **Construire :** gate/value/down projections, SiLU, deux résidus et assemblage pre-norm.
+
+**Commande exécutable :** `model block` affiche chaque forme, le compte des paramètres, la causalité du bloc et une comparaison des gradients avec et sans résidus.
 
 **Tests :** formes, propagation du gradient, causalité conservée et absence de NaN.
 

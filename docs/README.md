@@ -19,6 +19,9 @@ Ce dossier accompagne le code dans l'ordre où les concepts sont construits. Ne 
 13. [Self-attention causale](06-causal-self-attention.md)
 14. [ADR : attention multi-tête causale standard](architecture/decisions/0001-standard-causal-mha.md)
 15. [PR06 : inspecter et prouver la causalité](lab-notes/pr-06-causal-self-attention.md)
-16. [Plan complet des PR](plan-directeur.md)
+16. [SwiGLU et bloc Transformer pre-norm](07-transformer-block.md)
+17. [ADR : bloc pre-norm avec SwiGLU](architecture/decisions/0002-prenorm-swiglu-block.md)
+18. [PR07 : assembler et inspecter un bloc](lab-notes/pr-07-transformer-block.md)
+19. [Plan complet des PR](plan-directeur.md)
 
 Les prochains chapitres seront ajoutés avec leur implémentation. Un document ne prétendra jamais qu'un composant fonctionne avant que sa PR fournisse les tests correspondants.

@@ -92,7 +92,7 @@ Le masque créé pendant le forward est une ressource temporaire gérée par le 
 
 ## Limites de PR06
 
-- Pas encore de résidu, RMSNorm intégré ni SwiGLU : PR07 assemble le bloc.
+- La commande PR06 inspecte l'attention seule; le [bloc de PR07](07-transformer-block.md) ajoute résidus, RMSNorm et SwiGLU.
 - Pas de dropout d'attention; la référence reste déterministe.
 - Pas de KV cache pour la génération incrémentale.
 - Pas de padding mask, car les fenêtres PR04 sont actuellement pleines ou explicitement fragmentées.
