@@ -111,8 +111,8 @@ Le test anti-fuite est répété au niveau du bloc complet. Cela protège contre
 
 ## Limites de PR07
 
-- Un seul bloc est exécuté; PR08 construira une pile de `N` blocs.
-- Aucun embedding ni LM head n'est encore relié au bloc.
+- La commande PR07 exécute un seul bloc; le [modèle PR08](08-decoder-language-model.md) construit la pile de `N` blocs.
+- Embedding et LM head sont volontairement absents de l'expérience isolée PR07.
 - Aucun logit ou calcul de loss n'existe encore.
 - Dropout, mixed precision et optimisation des kernels restent hors de la référence.
 

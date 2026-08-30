@@ -1,6 +1,6 @@
 # Plan directeur de `lxp-mini-1xm`
 
-> Statut : PR01 à PR06 terminées; PR07 implémentée sur `feature/pr07-transformer-block`
+> Statut : PR01 à PR07 terminées; PR08 implémentée sur `feature/pr08-decoder-language-model`
 > Source de vérité initiale : [`docs2/project.md`](../docs2/project.md)  
 > Dernière mise à jour : 2026-08-30
 
@@ -293,8 +293,6 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 | Mise à niveau Kotlin/Jackson/Picocli |          PR future dédiée | compatibilité, notes de version et build JDK 25 verts |
 | Format JSON exact du tokenizer BPE   |                      PR03 | round-trip, merges et compatibilité de version        |
 | Stratégie de lecture des gros corpus |                      PR04 | mesure mémoire et débit                               |
-| Initialisation des poids             |                 PR05/PR08 | absence de NaN et single-batch overfit                |
-| API DJL de weight tying              |                      PR08 | test d'identité/partage réel du paramètre             |
 | Restaurabilité complète d'AdamW      |                      PR10 | test checkpoint + reprise exacte                      |
 | FP16/BF16                            |                après PR12 | gain mesuré, stabilité démontrée                      |
 | Dataset principal et langue          | avant le premier long run | licence, qualité, taille et objectif linguistique     |
@@ -387,6 +385,8 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 ### PR08 - Modèle decoder-only
 
 **Construire :** embeddings, N blocs, norme finale, LM head et weight tying optionnel.
+
+**Commande exécutable :** `model forward` instancie un preset, produit les logits et compare paramètres DJL réels et compte théorique; `--untie-embeddings` ajoute une matrice indépendante.
 
 **Tests :** logits `[B,T,V]`, compte réel contre compte théorique, partage réel des poids et forward sans NaN.
 
