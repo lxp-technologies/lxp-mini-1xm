@@ -79,7 +79,7 @@ Cette garantie ne rend pas tout entraînement reproductible. Les poids, le moteu
 
 EOS est l'ID spécial `2`. S'il est choisi, il est ajouté aux IDs générés puis la boucle s'arrête sans autre forward. `maxNewTokens` est une autre barrière : elle garantit la fin même si EOS n'est jamais choisi.
 
-PAD et BOS ne sont pas interdits au sampling. Un modèle correctement entraîné doit apprendre quand les produire ou non; PR12 pourra introduire des politiques d'évaluation plus avancées.
+PAD et BOS ne sont pas interdits au sampling. Un modèle correctement entraîné doit apprendre quand les produire ou non; PR12 conserve ce choix simple et évalue séparément loss, perplexité et samples fixes.
 
 ## Fenêtre glissante et coût
 
@@ -96,7 +96,7 @@ RoPE n'ajoute toujours aucun paramètre appris. Dans cette première fenêtre gl
 
 ## Contrat du tokenizer
 
-`generate` charge les artifacts `byte` et `byte-bpe`. Sa taille de vocabulaire doit être exactement celle de `run/config.yaml`; autrement la commande refuse le run. Le checkpoint ne contient pas encore le checksum du tokenizer, donc l'utilisateur doit toujours fournir `--tokenizer` explicitement.
+`generate` charge les artifacts `byte` et `byte-bpe`. Sa taille de vocabulaire doit être exactement celle de `run/config.yaml`; autrement la commande refuse le run. Le checkpoint seul ne contient pas le checksum du tokenizer, donc cette commande demande toujours `--tokenizer`. Les runs de corpus PR12 copient l'artifact et consignent son checksum dans leurs métadonnées.
 
 Avec un BPE byte-level, une pièce isolée peut représenter seulement une partie d'un caractère UTF-8 et s'afficher comme caractère de remplacement. Le `Complete text`, décodé à partir de toute la séquence, est la référence fiable.
 

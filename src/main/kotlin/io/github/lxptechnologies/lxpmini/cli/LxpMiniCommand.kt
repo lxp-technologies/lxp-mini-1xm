@@ -12,7 +12,14 @@ import java.util.concurrent.Callable
     name = "lxp-mini",
     mixinStandardHelpOptions = true,
     description = ["Explore and build a small language model, one concept at a time."],
-    subcommands = [ModelCommand::class, TokenizerCommand::class, DatasetCommand::class, TrainCommand::class, GenerateCommand::class],
+    subcommands = [
+        ModelCommand::class,
+        TokenizerCommand::class,
+        DatasetCommand::class,
+        TrainCommand::class,
+        GenerateCommand::class,
+        EvaluateCommand::class,
+    ],
 )
 class LxpMiniCommand : Runnable {
     override fun run() {
@@ -23,7 +30,12 @@ class LxpMiniCommand : Runnable {
 @Command(
     name = "train",
     description = ["Run focused training experiments."],
-    subcommands = [OverfitBatchCommand::class, CheckpointDemoCommand::class, CheckpointVerifyCommand::class],
+    subcommands = [
+        OverfitBatchCommand::class,
+        CheckpointDemoCommand::class,
+        CheckpointVerifyCommand::class,
+        CorpusTrainingCommand::class,
+    ],
 )
 class TrainCommand : Runnable {
     override fun run() {

@@ -25,9 +25,28 @@ class RunStoreTest {
             RunEnvironment("PyTorch", "2.7.1", "cpu()"),
             "c".repeat(64),
             42,
+            datasetKind = "utf8-corpus-contiguous-token-split",
+            tokenizer = "byte-bpe",
+            tokenizerSha256 = "e".repeat(64),
+            validationDatasetSha256 = "f".repeat(64),
         )
 
-        store.appendMetric(runDirectory, TrainingMetricRecord("train", 1, 16, 2.5f, 0.01f, 0.5f, false))
+        store.appendMetric(
+            runDirectory,
+            TrainingMetricRecord(
+                "train",
+                1,
+                16,
+                2.5f,
+                0.01f,
+                0.5f,
+                false,
+                validationLoss = 2.0,
+                validationPerplexity = 7.389,
+                tokensPerSecond = 128.0,
+                elapsedSeconds = 0.125,
+            ),
+        )
 
         assertThat(initialized.configSha256).isEqualTo(Sha256.of(runDirectory.resolve("config.yaml")))
         assertThat(runDirectory.resolve("checkpoints")).isDirectory()
@@ -35,8 +54,15 @@ class RunStoreTest {
         val metricLines = Files.readAllLines(runDirectory.resolve("metrics.jsonl"))
         assertThat(metricLines).hasSize(1)
         assertThat(ObjectMapper().readTree(metricLines.single()).get("update").asInt()).isEqualTo(1)
+        assertThat(ObjectMapper().readTree(metricLines.single()).get("validationLoss").asDouble()).isEqualTo(2.0)
         assertThat(Files.readString(runDirectory.resolve("run-metadata.json")))
-            .contains("\"exactTrainingResume\" : false", "\"datasetSha256\" : \"${"c".repeat(64)}\"")
+            .contains(
+                "\"exactTrainingResume\" : false",
+                "\"datasetSha256\" : \"${"c".repeat(64)}\"",
+                "\"tokenizerSha256\" : \"${"e".repeat(64)}\"",
+                "\"validationDatasetSha256\" : \"${"f".repeat(64)}\"",
+            )
+        assertThat(store.loadMetadata(runDirectory)).isEqualTo(initialized.metadata)
     }
 
     @Test

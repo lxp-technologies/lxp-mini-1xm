@@ -34,6 +34,9 @@ Ce dossier accompagne le code dans l'ordre où les concepts sont construits. Ne 
 28. [Génération autorégressive et sampling](11-generation-and-sampling.md)
 29. [ADR : sampling explicite et fenêtre glissante](architecture/decisions/0006-explicit-sampling-sliding-window.md)
 30. [PR11 : suivre les logits jusqu'au texte](lab-notes/pr-11-generation-and-sampling.md)
-31. [Plan complet des PR](plan-directeur.md)
+31. [Évaluation et premier tiny corpus](12-evaluation-and-tiny-corpus.md)
+32. [ADR : corpus train/validation explicites et vérifiés](architecture/decisions/0007-explicit-verified-corpus-splits.md)
+33. [PR12 : mesurer avant de passer au 17 M](lab-notes/pr-12-evaluation-and-tiny-corpus.md)
+34. [Plan complet des PR](plan-directeur.md)
 
 Les prochains chapitres seront ajoutés avec leur implémentation. Un document ne prétendra jamais qu'un composant fonctionne avant que sa PR fournisse les tests correspondants.

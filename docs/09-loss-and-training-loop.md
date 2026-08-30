@@ -96,6 +96,6 @@ Cette frontière garde le code pédagogique sans remplacer les primitives numér
 
 ## Portée de PR09
 
-PR09 prouve qu'un tiny model peut mémoriser un lot. Elle ne relie pas encore la boucle au corpus streamé de PR04 et ne calcule pas de validation loss. PR10 ajoute les checkpoints de poids avec une reprise explicitement limitée; la génération arrive en PR11; le premier entraînement de corpus mesuré et l'évaluation arrivent en PR12.
+PR09 prouve qu'un tiny model peut mémoriser un lot. PR10 ajoute les checkpoints de poids avec une reprise explicitement limitée, PR11 la génération, puis PR12 relie cette boucle au corpus streamé et mesure validation loss, perplexité, débit et samples fixes.
 
 La décision est consignée dans [ADR 0004](architecture/decisions/0004-explicit-adamw-training-loop.md). Les commandes et expériences sont dans la [note de laboratoire PR09](lab-notes/pr-09-single-batch-overfit.md).
