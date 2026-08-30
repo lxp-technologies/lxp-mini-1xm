@@ -15,6 +15,7 @@ flowchart LR
 - `config` charge et valide les expériences sans dépendre d'une bibliothèque neuronale.
 - `model` contient le compteur théorique et les primitives différentiables. PR05 ajoute embedding, RMSNorm et RoPE; PR06 ajoute l'attention; PR07 assemble un bloc; PR08 construit le decoder complet et ses logits.
 - `training` relie depuis PR09 les logits aux targets avec cross-entropy, backward, accumulation, clipping global, AdamW et warmup/cosine.
+- `checkpoint` crée depuis PR10 les runs, manifestes, checksums, métriques et round-trips de poids.
 - `cli` rend chaque concept exécutable depuis Gradle.
 - `tokenizer` et `data` préparent les `IntArray`; `model` les convertira progressivement en calcul neuronal DJL.
 - les futurs packages `generation` et `evaluation` apparaîtront seulement dans leur PR.
@@ -28,7 +29,7 @@ flowchart LR
 - JDK 25, Gradle 9.1+ et Kotlin/JVM;
 - aucune dépendance DJL n'a été ajoutée avant le premier tenseur en PR05; le code du modèle dépend de l'API DJL et non des classes internes PyTorch.
 
-## État après PR09
+## État après PR10
 
 ```mermaid
 flowchart LR
@@ -43,6 +44,9 @@ flowchart LR
     BACK --> OPT[Clip global + AdamW]
     OPT -. met à jour .-> EMB
     EMB -. même poids .-> HEAD
+    OPT --> CKPT[Checkpoint versionné]
+    CKPT --> LOAD[Nouveau modèle]
+    LOAD -. poids identiques .-> EMB
 ```
 
-Le forward et une boucle d'entraînement de référence existent. PR09 prouve l'apprentissage par mémorisation d'un lot synthétique; elle ne constitue pas encore une pipeline de corpus ni une mesure de généralisation. Les checkpoints arrivent en PR10 et l'évaluation en PR12.
+Le forward, la boucle d'entraînement et le checkpoint de poids existent. PR10 prouve des logits identiques dans un nouveau modèle et restaure la progression, mais déclare la reprise d'entraînement non exacte sans moments AdamW ni état RNG. La génération arrive en PR11 et l'évaluation en PR12.

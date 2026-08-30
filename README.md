@@ -2,6 +2,17 @@
 
 Petit modèle de langage decoder-only construit progressivement from scratch en Kotlin/JVM. Chaque PR introduit un concept exécutable, testé et documenté.
 
+## PR10 - Sauvegarder et vérifier un checkpoint
+
+Interrompt un tiny run, recrée le modèle, prouve des logits identiques et poursuit avec les limites de reprise affichées :
+
+```powershell
+.\gradlew.bat run --args="train checkpoint-demo --config configs/lab-pr09-tiny.yaml --run-dir build/labs/pr10/demo-001 --before-updates 10 --after-updates 5"
+.\gradlew.bat run --args="train checkpoint-verify --run-dir build/labs/pr10/demo-001"
+```
+
+Les poids, compteurs et scheduler sont restaurés; les moments AdamW et l'état aléatoire ne le sont pas, donc `exactTrainingResume=false`. Consulte le [chapitre PR10](docs/10-checkpoints-and-reproducible-runs.md) et la [note de laboratoire](docs/lab-notes/pr-10-checkpoint-round-trip.md).
+
 ## PR09 - Observer un modèle qui apprend
 
 Répète un lot synthétique sur un tiny model et affiche cross-entropy, learning rate, norme globale des gradients, clipping et tokens vus :
@@ -10,7 +21,7 @@ Répète un lot synthétique sur un tiny model et affiche cross-entropy, learnin
 .\gradlew.bat run --args="train overfit-batch --config configs/lab-pr09-tiny.yaml --updates 80 --report-every 10"
 ```
 
-La loss de référence chute d'environ `5.56` à moins de `0.001`. Ce sanity check valide backward, accumulation, AdamW et warmup/cosine avant tout long entraînement. Consulte le [chapitre PR09](docs/09-loss-and-training-loop.md) et la [note de laboratoire](docs/lab-notes/pr-09-single-batch-overfit.md).
+La loss de référence chute d'environ `5.56` à moins de `0.05`. Ce sanity check valide backward, accumulation, AdamW et warmup/cosine avant tout long entraînement. Consulte le [chapitre PR09](docs/09-loss-and-training-loop.md) et la [note de laboratoire](docs/lab-notes/pr-09-single-batch-overfit.md).
 
 ## PR08 - Exécuter le modèle decoder-only complet
 

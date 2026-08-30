@@ -30,7 +30,7 @@ Une update ne doit avoir lieu qu'après le nombre configuré de micro-batches. A
 ## Conséquences
 
 - Le code est plus long qu'un `EasyTrain.fit`, mais chaque transition reste observable.
-- Les états AdamW sont internes à DJL; PR10 devra déterminer comment les sauvegarder ou déclarer précisément la limite.
+- Les états AdamW sont internes à DJL; [ADR 0005](0005-versioned-weights-checkpoint.md) documente que leurs moments ne sont pas sérialisables par l'API publique DJL 0.36 et refuse donc une affirmation de reprise exacte.
 - Le trainer suppose que le modèle a déjà été initialisé et que ses tenseurs résident sur le même device que les batches.
 - `finishAccumulation()` doit être appelé lorsqu'un flux se termine avec un groupe partiel.
 - Le nombre total d'updates est connu à la création du scheduler.

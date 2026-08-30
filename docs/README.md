@@ -28,6 +28,9 @@ Ce dossier accompagne le code dans l'ordre où les concepts sont construits. Ne 
 22. [Loss et boucle d'entraînement](09-loss-and-training-loop.md)
 23. [ADR : boucle explicite avec AdamW DJL](architecture/decisions/0004-explicit-adamw-training-loop.md)
 24. [PR09 : mémoriser un seul batch](lab-notes/pr-09-single-batch-overfit.md)
-25. [Plan complet des PR](plan-directeur.md)
+25. [Checkpoints et runs reproductibles](10-checkpoints-and-reproducible-runs.md)
+26. [ADR : checkpoint versionné et reprise limitée](architecture/decisions/0005-versioned-weights-checkpoint.md)
+27. [PR10 : interrompre et restaurer un tiny run](lab-notes/pr-10-checkpoint-round-trip.md)
+28. [Plan complet des PR](plan-directeur.md)
 
 Les prochains chapitres seront ajoutés avec leur implémentation. Un document ne prétendra jamais qu'un composant fonctionne avant que sa PR fournisse les tests correspondants.
