@@ -48,7 +48,7 @@ run/
 - `latest.txt` contient un identifiant contrôlé comme `step-00000015`; ce n'est pas un chemin arbitraire.
 - `samples/` réserve l'emplacement des générations et évaluations persistées par de futurs runs complets.
 
-Le laboratoire PR10 utilise maintenant les IDs byte du motif synthétique lisible `abc `, mais aucun tokenizer n'est nécessaire pour entraîner ce lot déjà encodé. PR11 fournit séparément le même byte tokenizer pour décoder ces poids. Un futur vrai run devra lier son `tokenizer.json` et son checksum au run.
+Le laboratoire PR10 utilise maintenant les IDs byte du motif synthétique lisible `abc `, mais aucun tokenizer n'est nécessaire pour entraîner ce lot déjà encodé. PR11 fournit séparément le même byte tokenizer pour décoder ces poids. Depuis PR12, un run de corpus copie `tokenizer.json` et lie son checksum aux métadonnées.
 
 ## Sauvegarde fiable
 
@@ -121,6 +121,6 @@ Les API de paramètres utilisées sont celles du [`Block` DJL 0.36](https://java
 
 ## Portée de PR10
 
-PR10 ne fournit pas encore un entraînement de corpus général, une reprise multi-processus exacte ni une politique de rétention des checkpoints. PR11 utilise désormais les poids restaurés pour générer; PR12 ajoutera validation et vrais runs mesurés.
+PR10 ne fournit pas un entraînement de corpus général, une reprise multi-processus exacte ni une politique de rétention des checkpoints. PR11 utilise les poids restaurés pour générer; PR12 ajoute des runs frais mesurés et leur validation, sans prétendre résoudre la reprise exacte.
 
 La décision est consignée dans [ADR 0005](architecture/decisions/0005-versioned-weights-checkpoint.md). Les commandes et expériences sont dans la [note de laboratoire PR10](lab-notes/pr-10-checkpoint-round-trip.md).

@@ -2,6 +2,19 @@
 
 Petit modèle de langage decoder-only construit progressivement from scratch en Kotlin/JVM. Chaque PR introduit un concept exécutable, testé et documenté.
 
+## PR12 - Entraîner et évaluer un tiny corpus
+
+Entraîne le BPE uniquement sur le corpus train, puis lance un run mesuré avec validation séparée, checkpoints et prompts fixes :
+
+```powershell
+$runDir = "build/labs/pr12/demo-$(Get-Date -Format yyyyMMdd-HHmmss)"
+.\gradlew.bat run --args="tokenizer bpe train --input docs/lab-notes/samples/pr12-train.txt --vocab-size 272 --output build/labs/pr12/tokenizer.json"
+.\gradlew.bat run --args="train corpus --config configs/lab-pr12-tiny-corpus.yaml --tokenizer build/labs/pr12/tokenizer.json --train-corpus docs/lab-notes/samples/pr12-train.txt --validation-corpus docs/lab-notes/samples/pr12-validation.txt --run-dir $runDir --updates 60 --eval-every 10 --checkpoint-every 20 --shuffle-buffer 32 --prompt Lina --prompt Milo --sample-tokens 12"
+.\gradlew.bat run --args="evaluate --run-dir $runDir --validation-corpus docs/lab-notes/samples/pr12-validation.txt --checkpoint step-00000020 --checkpoint step-00000040 --checkpoint step-00000060"
+```
+
+Le run de référence réduit la validation loss de `5,5920` à `3,5578`, mais ses textes restent répétitifs : la décision documentée est de ne pas encore lancer le 17 M. Consulte le [chapitre PR12](docs/12-evaluation-and-tiny-corpus.md) et la [note de laboratoire](docs/lab-notes/pr-12-evaluation-and-tiny-corpus.md).
+
 ## PR11 - Générer token par token
 
 Entraîne le tiny model sur le motif byte lisible `abc `, crée son tokenizer puis inspecte chaque décision de génération :

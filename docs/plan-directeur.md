@@ -1,6 +1,6 @@
 # Plan directeur de `lxp-mini-1xm`
 
-> Statut : PR01 à PR10 terminées; PR11 implémentée sur `feature/pr11-generation-sampling`
+> Statut : PR01 à PR11 terminées; PR12 implémentée sur `feature/pr12-evaluation-tiny-corpus`
 > Source de vérité initiale : [`docs2/project.md`](../docs2/project.md)  
 > Dernière mise à jour : 2026-08-30
 
@@ -509,13 +509,13 @@ Le tokenizer doit être entraîné sur le corpus d'entraînement seulement. Util
 .\gradlew.bat run --args="train overfit-batch --config configs/lab-pr09-tiny.yaml --updates 80 --report-every 10"
 ```
 
-Ces deux sanity checks sont disponibles depuis PR09. Le premier vérifie formes et valeurs finies; le second doit faire chuter fortement la loss d'un lot synthétique. L'entraînement d'un corpus et sa validation ne sont pas encore exposés : checkpoints en PR10, génération en PR11, puis pipeline de corpus et évaluation en PR12.
+Ces deux sanity checks sont disponibles depuis PR09. Le premier vérifie formes et valeurs finies; le second doit faire chuter fortement la loss d'un lot synthétique. Depuis PR12, `train corpus` et `evaluate` ajoutent le premier run de corpus mesuré avec fichiers train/validation explicites.
 
-### 9.5 Lancer `mini-17m` après PR12
+### 9.5 Préparer `mini-17m` après la porte PR12
 
 ```powershell
 ./gradlew.bat run --args="model info --config configs/mini-17m.yaml"
-./gradlew.bat run --args="train --config configs/mini-17m.yaml --tokenizer artifacts/tokenizer/tokenizer.json --train data/prepared/train.txt --validation data/prepared/validation.txt --output runs/mini-17m-v1"
+./gradlew.bat run --args="train corpus --config configs/mini-17m.yaml --tokenizer artifacts/tokenizer/tokenizer.json --train-corpus data/prepared/train.txt --validation-corpus data/prepared/validation.txt --run-dir runs/mini-17m-v1 --updates 6104 --eval-every 100 --checkpoint-every 500"
 ```
 
 Configuration de départ, à mesurer avant modification :
@@ -536,6 +536,8 @@ training:
 
 Avec un contexte de 256, le batch effectif est `16 × 4 = 64` séquences, soit `16 384` tokens par mise à jour si tous les segments sont pleins. `100 M` tokens représentent alors environ `6 104` mises à jour optimizer; `500 M`, environ `30 518`. Cette estimation doit être recalculée à partir du compteur réel de tokens, pas utilisée comme compteur d'arrêt aveugle.
 
+La commande existe depuis PR12, mais le laboratoire PR12 ne franchit pas encore la porte qualitative : ses samples restent répétitifs. Cette section décrit donc la prochaine cible, pas une recommandation de lancer immédiatement le long run.
+
 ### 9.6 Surveiller et reprendre
 
 Chaque run doit produire :
@@ -552,7 +554,7 @@ runs/mini-17m-v1/
 
 Surveiller au minimum : step, tokens vus, train loss, validation loss, learning rate, gradient norm, tokens/s, temps écoulé et mémoire. Arrêter sur loss/gradient non fini. Une train loss qui baisse avec une validation loss qui remonte indique probablement du surapprentissage.
 
-La reprise générale d'un entraînement de corpus reste une interface cible de PR12 :
+La reprise générale exacte d'un entraînement de corpus reste indisponible après PR12 :
 
 ```powershell
 ./gradlew.bat run --args="train --resume runs/mini-17m-v1/checkpoints/latest"
@@ -564,20 +566,20 @@ Depuis PR11, la génération à partir d'un run PR10 et d'un tokenizer compatibl
 .\gradlew.bat run --args="generate --run-dir build/labs/pr11/demo-001 --tokenizer build/labs/pr11/tokenizer.json --prompt abc --max-new-tokens 12 --strategy sample --temperature 0.8 --top-k 40 --top-p 0.95 --seed 42"
 ```
 
-Cette reprise restaure les poids, le compteur, les tokens vus et le scheduler, mais pas les moments AdamW ni l'état RNG. Elle porte donc explicitement `exactTrainingResume=false`. La future commande générale `train --resume` ne devra être annoncée exacte que si poids, moments AdamW, scheduler, step et états aléatoires sont tous restaurés.
+Le format PR10 restaure les poids, le compteur, les tokens vus et le scheduler, mais pas les moments AdamW ni l'état RNG. Il porte donc explicitement `exactTrainingResume=false`. PR12 crée des runs frais et compare leurs checkpoints; la future commande générale `train --resume` ne devra être annoncée exacte que si poids, moments AdamW, scheduler, step et états aléatoires sont tous restaurés.
 
 ## 10. Matériel, mémoire et durée
 
 Les poids FP32 occupent environ `17 308 032 × 4 = 69,2 MB`. Pendant AdamW, il faut aussi compter gradients, deux moments de l'optimizer, activations, buffers temporaires et mémoire native du moteur. La mémoire réelle est donc très supérieure aux seuls poids et dépend du batch, du contexte et de l'implémentation.
 
-- CPU : suffisant pour PR01-PR11, les tests et les tiny runs; le vrai 17 M peut être très lent.
+- CPU : suffisant pour PR01-PR12, les tests et les tiny runs; le vrai 17 M peut être très lent.
 - GPU NVIDIA : chemin recommandé pour le long run; commencer avec une carte de 8 à 12 Go et réduire `batchSize` si nécessaire, sans promettre qu'une taille précise fonctionnera avant profilage.
 - Disque : prévoir le corpus brut, sa version préparée, le tokenizer, plusieurs checkpoints et les caches natifs DJL.
 - RAM : la pipeline PR04 doit streamer les données; elle ne doit pas supposer que tout le corpus tient dans le heap JVM.
 
 DJL alloue des ressources natives hors du contrôle direct du garbage collector. Chaque batch et chaque sous-`NDManager` temporaire devra être fermé. La documentation DJL recommande notamment de fermer chaque `Batch` et d'utiliser `debugDump()` pour repérer un nombre de ressources croissant ([gestion mémoire DJL](https://docs.djl.ai/master/docs/development/memory_management.html)).
 
-Il est trop tôt pour annoncer une durée d'entraînement fiable. PR12 mesurera les tokens/s sur la machine cible, puis calculera :
+PR12 mesure désormais des tokens/s sur CPU, mais son tiny run est trop court et trop petit pour annoncer une durée 17 M fiable. Après un profil représentatif sur la machine cible, calculer :
 
 ```text
 durée estimée en secondes = budget de tokens / tokens par seconde mesurés
