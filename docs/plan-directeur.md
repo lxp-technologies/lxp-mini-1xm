@@ -1,6 +1,6 @@
 # Plan directeur de `lxp-mini-1xm`
 
-> Statut : PR01 à PR08 terminées; PR09 implémentée sur `feature/pr09-loss-training-loop`
+> Statut : PR01 à PR09 terminées; PR10 implémentée sur `feature/pr10-checkpoints-reproducible-runs`
 > Source de vérité initiale : [`docs2/project.md`](../docs2/project.md)  
 > Dernière mise à jour : 2026-08-30
 
@@ -293,7 +293,7 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 | Mise à niveau Kotlin/Jackson/Picocli |          PR future dédiée | compatibilité, notes de version et build JDK 25 verts |
 | Format JSON exact du tokenizer BPE   |                      PR03 | round-trip, merges et compatibilité de version        |
 | Stratégie de lecture des gros corpus |                      PR04 | mesure mémoire et débit                               |
-| Restaurabilité complète d'AdamW      |                      PR10 | test checkpoint + reprise exacte                      |
+| Restaurabilité complète d'AdamW      | PR10 : non supportée par l'API DJL 0.36 | moments privés; limite déclarée et reprise non exacte |
 | FP16/BF16                            |                après PR12 | gain mesuré, stabilité démontrée                      |
 | Dataset principal et langue          | avant le premier long run | licence, qualité, taille et objectif linguistique     |
 | Budget final de tokens               |                      PR12 | courbes de validation et budget matériel              |
@@ -552,12 +552,21 @@ runs/mini-17m-v1/
 
 Surveiller au minimum : step, tokens vus, train loss, validation loss, learning rate, gradient norm, tokens/s, temps écoulé et mémoire. Arrêter sur loss/gradient non fini. Une train loss qui baisse avec une validation loss qui remonte indique probablement du surapprentissage.
 
+Les deux commandes suivantes décrivent toujours l'interface cible après PR11-PR12; elles ne sont pas encore disponibles en PR10 :
+
 ```powershell
 ./gradlew.bat run --args="train --resume runs/mini-17m-v1/checkpoints/latest"
 ./gradlew.bat run --args="generate --checkpoint runs/mini-17m-v1/checkpoints/latest --prompt 'Once upon a time' --max-new-tokens 128 --temperature 0.8 --top-k 40 --top-p 0.95"
 ```
 
-La reprise ne sera déclarée exacte que si les poids, l'état AdamW, le scheduler, le step et les états aléatoires sont restaurés.
+Depuis PR10, le laboratoire de checkpoint exécutable est :
+
+```powershell
+.\gradlew.bat run --args="train checkpoint-demo --config configs/lab-pr09-tiny.yaml --run-dir build/labs/pr10/demo-001 --before-updates 10 --after-updates 5"
+.\gradlew.bat run --args="train checkpoint-verify --run-dir build/labs/pr10/demo-001"
+```
+
+Cette reprise restaure les poids, le compteur, les tokens vus et le scheduler, mais pas les moments AdamW ni l'état RNG. Elle porte donc explicitement `exactTrainingResume=false`. La future commande générale `train --resume` ne devra être annoncée exacte que si poids, moments AdamW, scheduler, step et états aléatoires sont tous restaurés.
 
 ## 10. Matériel, mémoire et durée
 

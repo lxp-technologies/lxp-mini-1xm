@@ -18,11 +18,12 @@ class WarmupCosineSchedulerTest {
     }
 
     @Test
-    fun `tracker converts zero based optimizer counts to one based updates`() {
+    fun `tracker uses DJL one based optimizer counts and clamps inference calls`() {
         val scheduler = WarmupCosineScheduler(0.01f, 0.001f, warmupUpdates = 2, totalUpdates = 6)
 
+        assertThat(scheduler.getNewValue(1)).isEqualTo(scheduler.learningRateForUpdate(1))
+        assertThat(scheduler.getNewValue(6)).isEqualTo(scheduler.learningRateForUpdate(6))
         assertThat(scheduler.getNewValue(0)).isEqualTo(scheduler.learningRateForUpdate(1))
-        assertThat(scheduler.getNewValue(5)).isEqualTo(scheduler.learningRateForUpdate(6))
         assertThat(scheduler.getNewValue(100)).isEqualTo(scheduler.learningRateForUpdate(6))
     }
 

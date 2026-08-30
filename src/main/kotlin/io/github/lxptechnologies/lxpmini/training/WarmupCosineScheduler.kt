@@ -27,7 +27,7 @@ class WarmupCosineScheduler(
     }
 
     override fun getNewValue(numUpdate: Int): Float =
-        learningRateForUpdate((numUpdate + 1).coerceIn(1, totalUpdates))
+        learningRateForUpdate(numUpdate.coerceIn(1, totalUpdates))
 
     fun learningRateForUpdate(updateNumber: Int): Float {
         if (updateNumber !in 1..totalUpdates) {

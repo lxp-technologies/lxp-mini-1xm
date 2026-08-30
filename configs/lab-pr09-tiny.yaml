@@ -11,8 +11,8 @@ model:
 training:
   batchSize: 2
   gradientAccumulationSteps: 1
-  learningRate: 0.03
-  minLearningRate: 0.003
+  learningRate: 0.01
+  minLearningRate: 0.001
   warmupSteps: 5
   weightDecay: 0.0
   beta1: 0.9

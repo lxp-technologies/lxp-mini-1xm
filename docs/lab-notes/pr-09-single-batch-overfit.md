@@ -32,18 +32,18 @@ Le preset utilise `V=259`, `C=16`, un bloc, deux têtes, une séquence de 8 toke
 Batch shape:      (2, 8) = [B, T]
 Optimizer:        AdamW
 Accumulation:     1 micro-batch(es)/update
-update=   1 loss=5.562087 lr=0.006000 grad=3.456999->1.000000 clipped=true  tokens=16
-update=  10 loss=1.509770 lr=0.029806 grad=1.439417->1.000000 clipped=true  tokens=160
-update=  20 loss=0.043364 lr=0.027685 grad=0.156599->0.156599 clipped=false tokens=320
-update=  80 loss=0.000165 lr=0.003000 grad=0.000752->0.000752 clipped=false tokens=1280
+update=   1 loss=5.562087 lr=0.002000 grad=3.456999->1.000000 clipped=true  tokens=16
+update=  10 loss=4.172859 lr=0.009935 grad=2.452459->1.000000 clipped=true  tokens=160
+update=  20 loss=1.793514 lr=0.009228 grad=1.671549->1.000000 clipped=true  tokens=320
+update=  80 loss=0.031025 lr=0.001000 grad=0.098924->0.098924 clipped=false tokens=1280
 Initial loss:     5.562087
-Final loss:       0.000165
-Reduction factor: 33803.964844x
+Final loss:       0.031025
+Reduction factor: 179.276169x
 Loss decreased:   true
 Manager closed:   true
 ```
 
-Les valeurs peuvent varier avec une autre version du moteur ou une autre machine, mais la loss doit rester finie et chuter fortement. À l'update 1, le clipping ramène bien `3.456999` à `1.0`. À l'update 80, le learning rate atteint le minimum configuré.
+Les valeurs peuvent varier avec une autre version du moteur ou une autre machine, mais la loss doit rester finie et chuter fortement. À l'update 1, le clipping ramène bien `3.456999` à `1.0`. À l'update 80, le learning rate atteint le minimum configuré. Ces valeurs ont été remesurées en PR10 après correction du compteur transmis au `Tracker` DJL; les taux affichés sont désormais exactement ceux appliqués par AdamW.
 
 ## Expérience 1 - Observer plus finement le warmup
 
@@ -51,7 +51,7 @@ Les valeurs peuvent varier avec une autre version du moteur ou une autre machine
 .\gradlew.bat run --args="train overfit-batch --config configs/lab-pr09-tiny.yaml --updates 20 --report-every 1"
 ```
 
-Les cinq premiers learning rates doivent progresser linéairement vers `0.03`. La première update suivant le warmup reste au maximum, puis la décroissance commence. `--updates` doit être strictement supérieur à `warmupSteps`.
+Les cinq premiers learning rates doivent progresser linéairement vers `0.01`. La première update suivant le warmup reste au maximum, puis la décroissance commence. `--updates` doit être strictement supérieur à `warmupSteps`.
 
 ## Expérience 2 - Tester l'accumulation
 
@@ -103,7 +103,7 @@ Lorsque `clipped=true`, la norme après la flèche doit valoir `0.100000`. La co
 .\gradlew.bat test
 ```
 
-Les 117 tests actuels couvrent notamment loss connue, gradients finis, formes invalides, scheduler, accumulation complète et partielle, clipping, overfit direct et overfit par la CLI.
+Les 124 tests actuels après PR10 couvrent notamment loss connue, gradients finis, formes invalides, scheduler, accumulation complète et partielle, clipping, overfit direct et overfit par la CLI.
 
 ## Questions et réponses
 
@@ -129,8 +129,8 @@ Le projet veut rendre la boucle visible, pas réimplémenter chaque primitive nu
 
 ### Puis-je déjà entraîner `mini-17m` sur mon dataset?
 
-Pas encore avec une commande supportée de bout en bout. PR09 n'intègre que le test d'overfit synthétique. Les checkpoints arrivent en PR10 et la pipeline de vrai run avec validation en PR12. Attendre ces garde-fous évite de perdre des heures sur un run impossible à reprendre ou à évaluer.
+Pas encore avec une commande supportée de bout en bout. PR09 n'intègre que le test d'overfit synthétique. PR10 ajoute maintenant les checkpoints de poids, mais la pipeline de vrai run avec validation arrive en PR12. Attendre ces garde-fous évite de perdre des heures sur un run impossible à évaluer ou à reprendre exactement.
 
 ## Prochaine étape
 
-PR10 sauvegardera les poids et étudiera la restauration des états AdamW, du scheduler et des compteurs. La preuve attendue sera un round-trip dont les logits restent identiques.
+PR10 sauvegarde maintenant les poids et prouve un round-trip aux logits identiques. Le scheduler et les compteurs reprennent, mais les moments AdamW et l'état RNG ne sont pas exposés comme une reprise exacte.

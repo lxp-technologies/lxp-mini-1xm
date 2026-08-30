@@ -98,6 +98,30 @@ class LanguageModelTrainerTest {
         }
     }
 
+    @Test
+    fun `restores progress and continues at the next scheduled update`() {
+        NDManager.newBaseManager(Device.cpu()).use { manager ->
+            DecoderLanguageModel(manager, tinyModelConfig()).use { model ->
+                model.initialize(manager, DataType.FLOAT32, Shape(1, 4))
+                val trainer = LanguageModelTrainer(
+                    model,
+                    manager,
+                    tinyTrainingConfig(warmupSteps = 1),
+                    totalUpdates = 6,
+                    initialProgress = TrainingProgress(optimizerUpdates = 3, tokensSeen = 12),
+                )
+                val input = manager.create(longArrayOf(1, 2, 3, 4), Shape(1, 4))
+                val targets = manager.create(longArrayOf(2, 3, 4, 5), Shape(1, 4))
+
+                val update = requireNotNull(trainer.trainMicroBatch(input, targets).optimizerUpdate)
+
+                assertThat(update.updateNumber).isEqualTo(4)
+                assertThat(update.learningRate).isEqualTo(trainer.scheduler.learningRateForUpdate(4))
+                assertThat(update.tokensSeen).isEqualTo(16)
+            }
+        }
+    }
+
     private fun tinyModelConfig() = ModelConfig(
         vocabSize = 16,
         contextLength = 4,
@@ -117,8 +141,8 @@ class LanguageModelTrainerTest {
     ) = TrainingConfig(
         batchSize = 1,
         gradientAccumulationSteps = accumulationSteps,
-        learningRate = 0.03,
-        minLearningRate = 0.003,
+        learningRate = 0.01,
+        minLearningRate = 0.001,
         warmupSteps = warmupSteps,
         weightDecay = 0.0,
         beta1 = 0.9,

@@ -16,6 +16,7 @@ class LanguageModelTrainer(
     manager: NDManager,
     private val config: TrainingConfig,
     totalUpdates: Int,
+    initialProgress: TrainingProgress = TrainingProgress(),
     private val lossFunction: NextTokenCrossEntropy = NextTokenCrossEntropy(),
 ) {
     val scheduler = WarmupCosineScheduler(
@@ -31,16 +32,21 @@ class LanguageModelTrainer(
         .optBeta1(config.beta1.toFloat())
         .optBeta2(config.beta2.toFloat())
         .optWeightDecays(config.weightDecay.toFloat())
+        .optBeginNumUpdate(initialProgress.optimizerUpdates)
         .build()
     private var accumulatedMicroBatches = 0
 
-    var optimizerUpdates: Int = 0
+    var optimizerUpdates: Int = initialProgress.optimizerUpdates
         private set
-    var tokensSeen: Long = 0
+    var tokensSeen: Long = initialProgress.tokensSeen
         private set
 
     init {
         if (!model.isInitialized) throw TrainingException("Model must be initialized before creating its trainer")
+        if (initialProgress.optimizerUpdates !in 0 until totalUpdates) {
+            throw TrainingException("Restored optimizerUpdates must be in [0, totalUpdates)")
+        }
+        if (initialProgress.tokensSeen < 0) throw TrainingException("Restored tokensSeen must be non-negative")
         if (config.gradientAccumulationSteps <= 0) {
             throw TrainingException("gradientAccumulationSteps must be positive")
         }
@@ -161,4 +167,9 @@ data class OptimizerUpdateMetrics(
     val clipped: Boolean,
     val microBatches: Int,
     val tokensSeen: Long,
+)
+
+data class TrainingProgress(
+    val optimizerUpdates: Int = 0,
+    val tokensSeen: Long = 0,
 )

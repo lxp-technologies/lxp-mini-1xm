@@ -82,7 +82,7 @@ flowchart LR
     COS --> MIN[Learning rate minimal<br/>dernière update]
 ```
 
-Pendant le warmup, l'update `u` utilise `maxLearningRate * u / warmupUpdates`. La première update après le warmup est encore au maximum, puis le cosinus atteint exactement le minimum à la dernière update. Les numéros affichés sont basés sur 1, même si l'API `Tracker` de DJL appelle le scheduler avec un compteur basé sur 0.
+Pendant le warmup, l'update `u` utilise `maxLearningRate * u / warmupUpdates`. La première update après le warmup est encore au maximum, puis le cosinus atteint exactement le minimum à la dernière update. Les numéros affichés sont basés sur 1, comme le compteur transmis par l'optimizer DJL. PR10 a ajouté un test d'intégration de ce contrat et corrigé l'adapter qui avançait auparavant le taux interne d'une update.
 
 ## Pourquoi cette implémentation
 
@@ -96,6 +96,6 @@ Cette frontière garde le code pédagogique sans remplacer les primitives numér
 
 ## Portée de PR09
 
-PR09 prouve qu'un tiny model peut mémoriser un lot. Elle ne relie pas encore la boucle au corpus streamé de PR04, ne sauvegarde pas l'optimizer et ne calcule pas de validation loss. Les checkpoints arrivent en PR10; la génération en PR11; le premier entraînement de corpus mesuré et l'évaluation arrivent en PR12.
+PR09 prouve qu'un tiny model peut mémoriser un lot. Elle ne relie pas encore la boucle au corpus streamé de PR04 et ne calcule pas de validation loss. PR10 ajoute les checkpoints de poids avec une reprise explicitement limitée; la génération arrive en PR11; le premier entraînement de corpus mesuré et l'évaluation arrivent en PR12.
 
 La décision est consignée dans [ADR 0004](architecture/decisions/0004-explicit-adamw-training-loop.md). Les commandes et expériences sont dans la [note de laboratoire PR09](lab-notes/pr-09-single-batch-overfit.md).
