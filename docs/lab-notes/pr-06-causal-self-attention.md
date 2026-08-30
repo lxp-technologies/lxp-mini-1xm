@@ -1,6 +1,6 @@
 # Laboratoire PR06 - Inspecter et prouver la causalité
 
-Date : 2026-08-30  
+Date : 2026-08-30<br>
 Branche : `feature/pr06-causal-self-attention`
 
 ## Objectifs
