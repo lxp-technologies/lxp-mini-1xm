@@ -1,6 +1,6 @@
 # Plan directeur de `lxp-mini-1xm`
 
-> Statut : PR01 terminée; PR02 implémentée sur `feature/pr02-byte-tokenizer`
+> Statut : PR01 et PR02 terminées; PR03 implémentée sur `feature/pr03-byte-level-bpe`
 > Source de vérité initiale : [`docs2/project.md`](../docs2/project.md)  
 > Dernière mise à jour : 2026-08-29
 
@@ -328,9 +328,11 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 
 **Construire :** comptage de paires, sélection déterministe, merges, vocabulaire, `tokenizer.json`, encodeur fidèle et CLI train/inspect.
 
+**Commandes exécutables :** `tokenizer bpe train` apprend et sauvegarde les merges; `tokenizer bpe inspect` montre IDs, pièces, ratio bytes/token, vocabulaire et règles apprises.
+
 **Tests :** premiers merges calculables à la main, égalités départagées de façon stable, sérialisation et round-trip.
 
-**Expérience :** comparer bytes/token pour vocabulaires 256, 1 024 et 4 096.
+**Expérience :** comparer d'abord les vocabulaires 259, 264 et 272 sur le corpus pédagogique, puis 1 024, 4 096 et 8 192 uniquement sur un corpus assez grand pour produire ces nombres de merges.
 
 **Critère de sortie :** le même corpus et la même config produisent le même tokenizer et checksum.
 
@@ -485,8 +487,8 @@ Avant l'entraînement, vérifier :
 ### 9.3 Entraîner le tokenizer après PR03
 
 ```powershell
-./gradlew.bat run --args="tokenizer train --input data/prepared/train.txt --vocab-size 8192 --output artifacts/tokenizer"
-./gradlew.bat run --args="tokenizer inspect --tokenizer artifacts/tokenizer/tokenizer.json --text 'Bonjour Patrick'"
+.\gradlew.bat run --args="tokenizer bpe train --input data/prepared/train.txt --vocab-size 8192 --output artifacts/tokenizer/tokenizer.json"
+.\gradlew.bat run --args="tokenizer bpe inspect --tokenizer artifacts/tokenizer/tokenizer.json --text 'Bonjour Patrick'"
 ```
 
 Le tokenizer doit être entraîné sur le corpus d'entraînement seulement. Utiliser la validation pour apprendre les merges serait une fuite de données.

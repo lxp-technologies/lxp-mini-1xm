@@ -1,0 +1,5 @@
+Bonjour Patrick. Bonjour le monde.
+Le petit modele apprend avec un petit corpus.
+Un tokenizer apprend les morceaux frequents du corpus.
+Bonjour tokenizer. Bonjour petit modele.
+Le modele apprend, le tokenizer apprend, et nous observons les merges.

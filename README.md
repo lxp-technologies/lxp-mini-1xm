@@ -2,6 +2,17 @@
 
 Petit modèle de langage decoder-only construit progressivement from scratch en Kotlin/JVM. Chaque PR introduit un concept exécutable, testé et documenté.
 
+## PR03 - Entraîner un byte-level BPE
+
+Entraîne un petit tokenizer déterministe sur le corpus de laboratoire, puis inspecte les pièces apprises :
+
+```powershell
+.\gradlew.bat run --args="tokenizer bpe train --input docs/lab-notes/samples/pr03-corpus.txt --vocab-size 272 --output build/labs/pr03/tokenizer.json"
+.\gradlew.bat run --args="tokenizer bpe inspect --tokenizer build/labs/pr03/tokenizer.json --text 'Bonjour bonjour' --show-merges 13 --show-vocabulary 13"
+```
+
+Le vocabulaire minimal vaut 259, car il inclut `PAD`, `BOS`, `EOS` et les 256 bytes. La [note de laboratoire PR03](docs/lab-notes/pr-03-byte-level-bpe.md) explique comment comparer plusieurs tailles et interpréter le ratio bytes/token.
+
 ## PR02 - Explorer le byte tokenizer
 
 Affiche les bytes UTF-8 et les IDs produits pour un texte contenant un accent et un emoji :
