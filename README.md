@@ -2,6 +2,19 @@
 
 Petit modèle de langage decoder-only construit progressivement from scratch en Kotlin/JVM. Chaque PR introduit un concept exécutable, testé et documenté.
 
+## PR11 - Générer token par token
+
+Entraîne le tiny model sur le motif byte lisible `abc `, crée son tokenizer puis inspecte chaque décision de génération :
+
+```powershell
+$runDir = "build/labs/pr11/demo-$(Get-Date -Format yyyyMMdd-HHmmss)"
+.\gradlew.bat run --args="tokenizer byte create --output build/labs/pr11/tokenizer.json"
+.\gradlew.bat run --args="train checkpoint-demo --config configs/lab-pr09-tiny.yaml --run-dir $runDir --before-updates 80 --after-updates 1"
+.\gradlew.bat run --args="generate --run-dir $runDir --tokenizer build/labs/pr11/tokenizer.json --prompt abc --max-new-tokens 12 --strategy greedy --show-candidates 4"
+```
+
+La trace montre le contexte, le logit `z`, la probabilité filtrée, l'ID choisi et sa pièce de texte. `--strategy sample` active température, top-k, top-p et seed. Consulte le [chapitre PR11](docs/11-generation-and-sampling.md) et le [laboratoire des quatre températures](docs/lab-notes/pr-11-generation-and-sampling.md).
+
 ## PR10 - Sauvegarder et vérifier un checkpoint
 
 Interrompt un tiny run, recrée le modèle, prouve des logits identiques et poursuit avec les limites de reprise affichées :

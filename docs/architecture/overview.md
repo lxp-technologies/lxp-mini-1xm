@@ -16,9 +16,10 @@ flowchart LR
 - `model` contient le compteur théorique et les primitives différentiables. PR05 ajoute embedding, RMSNorm et RoPE; PR06 ajoute l'attention; PR07 assemble un bloc; PR08 construit le decoder complet et ses logits.
 - `training` relie depuis PR09 les logits aux targets avec cross-entropy, backward, accumulation, clipping global, AdamW et warmup/cosine.
 - `checkpoint` crée depuis PR10 les runs, manifestes, checksums, métriques et round-trips de poids.
+- `generation` transforme depuis PR11 les derniers logits en token avec greedy ou sampling filtré, puis maintient la boucle autorégressive.
 - `cli` rend chaque concept exécutable depuis Gradle.
 - `tokenizer` et `data` préparent les `IntArray`; `model` les convertira progressivement en calcul neuronal DJL.
-- les futurs packages `generation` et `evaluation` apparaîtront seulement dans leur PR.
+- le futur package `evaluation` apparaîtra seulement en PR12.
 
 ## Décisions de PR01
 
@@ -29,7 +30,7 @@ flowchart LR
 - JDK 25, Gradle 9.1+ et Kotlin/JVM;
 - aucune dépendance DJL n'a été ajoutée avant le premier tenseur en PR05; le code du modèle dépend de l'API DJL et non des classes internes PyTorch.
 
-## État après PR10
+## État après PR11
 
 ```mermaid
 flowchart LR
@@ -47,6 +48,12 @@ flowchart LR
     OPT --> CKPT[Checkpoint versionné]
     CKPT --> LOAD[Nouveau modèle]
     LOAD -. poids identiques .-> EMB
+    LOAD --> LAST[Derniers logits<br/>V]
+    LAST --> SAMPLE[Greedy ou sampling<br/>température, top-k, top-p]
+    SAMPLE --> TOKEN[Prochain ID]
+    TOKEN --> WINDOW[Fenêtre glissante]
+    WINDOW --> EMB
+    TOKEN --> DECODE[Texte décodé]
 ```
 
-Le forward, la boucle d'entraînement et le checkpoint de poids existent. PR10 prouve des logits identiques dans un nouveau modèle et restaure la progression, mais déclare la reprise d'entraînement non exacte sans moments AdamW ni état RNG. La génération arrive en PR11 et l'évaluation en PR12.
+Le forward, la boucle d'entraînement, les checkpoints et la génération existent. PR11 recharge le dernier checkpoint vérifié, exige un tokenizer au vocabulaire compatible et recalcule actuellement tout le contexte à chaque token. L'évaluation de corpus et le KV cache restent hors périmètre; PR12 ajoutera l'évaluation.
