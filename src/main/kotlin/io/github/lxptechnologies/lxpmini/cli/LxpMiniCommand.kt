@@ -23,7 +23,7 @@ class LxpMiniCommand : Runnable {
 @Command(
     name = "train",
     description = ["Run focused training experiments."],
-    subcommands = [OverfitBatchCommand::class],
+    subcommands = [OverfitBatchCommand::class, CheckpointDemoCommand::class, CheckpointVerifyCommand::class],
 )
 class TrainCommand : Runnable {
     override fun run() {
