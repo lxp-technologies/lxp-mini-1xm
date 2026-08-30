@@ -21,6 +21,7 @@ import io.github.lxptechnologies.lxpmini.training.LanguageModelTrainer
 import io.github.lxptechnologies.lxpmini.training.OptimizerUpdateMetrics
 import io.github.lxptechnologies.lxpmini.training.TrainingException
 import io.github.lxptechnologies.lxpmini.training.TrainingProgress
+import io.github.lxptechnologies.lxpmini.tokenizer.ByteTokenizer
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
 import java.nio.charset.StandardCharsets
@@ -202,8 +203,10 @@ class CheckpointDemoCommand(
 
     private fun syntheticBatch(shape: Shape): SyntheticBatch {
         val size = shape.size().toInt()
-        val inputs = LongArray(size) { index -> 3L + index % 4 }
-        val targets = LongArray(size) { index -> 3L + (index + 1) % 4 }
+        val pattern = "abc ".toByteArray(StandardCharsets.US_ASCII)
+            .map { byte -> (byte.toInt() + ByteTokenizer.BYTE_TOKEN_OFFSET).toLong() }
+        val inputs = LongArray(size) { index -> pattern[index % pattern.size] }
+        val targets = LongArray(size) { index -> pattern[(index + 1) % pattern.size] }
         val description = "shape=${shape[0]}x${shape[1]};inputs=${inputs.joinToString(",")};targets=${targets.joinToString(",")}"
         return SyntheticBatch(inputs, targets, description)
     }
