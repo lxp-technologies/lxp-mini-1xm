@@ -2,6 +2,23 @@
 
 Petit modèle de langage decoder-only construit progressivement from scratch en Kotlin/JVM. Chaque PR introduit un concept exécutable, testé et documenté.
 
+## PR02 - Explorer le byte tokenizer
+
+Affiche les bytes UTF-8 et les IDs produits pour un texte contenant un accent et un emoji :
+
+```powershell
+.\gradlew.bat run --args="tokenizer byte inspect --text-file docs/lab-notes/samples/pr02-unicode.txt --add-bos --add-eos"
+```
+
+Crée ensuite l'artefact versionné du tokenizer :
+
+```powershell
+.\gradlew.bat run --args="tokenizer byte create --output build/labs/pr02/tokenizer.json"
+Get-Content build/labs/pr02/tokenizer.json
+```
+
+Sous Linux ou macOS, remplace `.\gradlew.bat` par `./gradlew` et utilise `cat` pour afficher le JSON. `--text-file` préserve les caractères Unicode indépendamment de l'encodage du terminal Windows. Le chapitre [Comprendre la tokenization](docs/02-tokenization.md) et la [note de laboratoire PR02](docs/lab-notes/pr-02-byte-tokenizer.md) expliquent chaque nombre affiché.
+
 ## PR01 - Exécuter les fondations
 
 PR01 valide les configurations YAML et calcule le nombre théorique de paramètres. Elle ne contient pas encore de tokenizer ni de réseau neuronal.
