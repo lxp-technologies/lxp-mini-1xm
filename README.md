@@ -2,6 +2,23 @@
 
 Petit modèle de langage decoder-only construit progressivement from scratch en Kotlin/JVM. Chaque PR introduit un concept exécutable, testé et documenté.
 
+## PR04 - Inspecter les séquences d'entraînement
+
+Observe d'abord le décalage next-token sans tokenizer :
+
+```powershell
+.\gradlew.bat run --args="dataset window --tokens 10,20,30,40,50 --context-length 4"
+```
+
+Puis entraîne le tokenizer de laboratoire et parcours réellement le corpus par streaming :
+
+```powershell
+.\gradlew.bat run --args="tokenizer bpe train --input docs/lab-notes/samples/pr03-corpus.txt --vocab-size 272 --output build/labs/pr04/tokenizer.json"
+.\gradlew.bat run --args="dataset inspect --corpus docs/lab-notes/samples/pr03-corpus.txt --tokenizer build/labs/pr04/tokenizer.json --context-length 8 --batch-size 3 --validation-fraction 0.2 --split train --shuffle-buffer 4 --seed 42 --show-batches 2"
+```
+
+La [note de laboratoire PR04](docs/lab-notes/pr-04-dataset-and-sequences.md) explique les formes `[B,T]`, le split sans fuite, les fragments finaux et la mémoire bornée.
+
 ## PR03 - Entraîner un byte-level BPE
 
 Entraîne un petit tokenizer déterministe sur le corpus de laboratoire, puis inspecte les pièces apprises :

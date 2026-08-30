@@ -1,6 +1,6 @@
 # Plan directeur de `lxp-mini-1xm`
 
-> Statut : PR01 et PR02 terminées; PR03 implémentée sur `feature/pr03-byte-level-bpe`
+> Statut : PR01 à PR03 terminées; PR04 implémentée sur `feature/pr04-streaming-dataset`
 > Source de vérité initiale : [`docs2/project.md`](../docs2/project.md)  
 > Dernière mise à jour : 2026-08-29
 
@@ -339,6 +339,8 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 ### PR04 - Dataset et séquences
 
 **Construire :** lecture de texte locale en flux, split déterministe, flux continu de tokens, fenêtres `input/target`, batching, seed et CLI d'inspection.
+
+**Commandes exécutables :** `dataset window` expose le décalage next-token sur des IDs explicites; `dataset inspect` compte le corpus, construit les plages disjointes et affiche des batches reproductibles.
 
 **Tests :** décalage exact d'un token, frontières, dernier segment, split sans fuite et shuffle reproductible.
 
