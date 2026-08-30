@@ -2,7 +2,7 @@
 
 ## Ce que nous construisons
 
-Un Transformer decoder-only autoregressif d'environ 17 millions de paramètres, entraîné from scratch en Kotlin/JVM. DJL fournira plus tard les tenseurs et l'autograd; l'architecture du modèle restera notre code.
+Un Transformer decoder-only autoregressif d'environ 17 millions de paramètres, entraîné from scratch en Kotlin/JVM. Depuis PR05, DJL fournit les tenseurs et l'autograd; l'architecture du modèle reste notre code.
 
 ## Pourquoi un petit modèle
 
