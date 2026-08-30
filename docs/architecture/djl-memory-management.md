@@ -31,6 +31,8 @@ PR05 utilise un base manager pour la démonstration et un sous-manager dédié a
 - Tester `isReleased` ou `isOpen` sur les chemins critiques et profiler une boucle prolongée avant le premier long entraînement.
 - Fermer aussi les chemins d'erreur avec `try/finally` ou `use`.
 
-## Que prouve PR05?
+Depuis PR09, chaque micro-batch de la CLI possède son sous-manager. Le calcul de norme ferme aussi immédiatement les tenseurs `square` et `sum`, car ils sont créés depuis les gradients durables et hériteraient autrement du manager des poids.
 
-`DjlEngineTest` ferme un manager de base, les tests de RoPE ferment son sous-manager sans fermer le parent, et `model components` imprime `Manager closed: true`. Ces tests vérifient le cycle de vie structurel; un soak test mémoire sur plusieurs milliers de batches sera ajouté quand le modèle et l'entraînement existeront.
+## Que prouvent PR05 et PR09?
+
+`DjlEngineTest` ferme un manager de base, les tests de RoPE ferment son sous-manager sans fermer le parent, et les commandes `model components` et `train overfit-batch` impriment `Manager closed: true`. Ces tests vérifient le cycle de vie structurel; un soak test mémoire sur plusieurs milliers de batches reste nécessaire avant un long entraînement.

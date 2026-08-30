@@ -25,6 +25,9 @@ Ce dossier accompagne le code dans l'ordre où les concepts sont construits. Ne 
 19. [Modèle decoder-only et logits](08-decoder-language-model.md)
 20. [ADR : weight tying réel et initialisation](architecture/decisions/0003-weight-tying-and-initialization.md)
 21. [PR08 : instancier le modèle complet](lab-notes/pr-08-decoder-language-model.md)
-22. [Plan complet des PR](plan-directeur.md)
+22. [Loss et boucle d'entraînement](09-loss-and-training-loop.md)
+23. [ADR : boucle explicite avec AdamW DJL](architecture/decisions/0004-explicit-adamw-training-loop.md)
+24. [PR09 : mémoriser un seul batch](lab-notes/pr-09-single-batch-overfit.md)
+25. [Plan complet des PR](plan-directeur.md)
 
 Les prochains chapitres seront ajoutés avec leur implémentation. Un document ne prétendra jamais qu'un composant fonctionne avant que sa PR fournisse les tests correspondants.
