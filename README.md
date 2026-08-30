@@ -2,6 +2,16 @@
 
 Petit modèle de langage decoder-only construit progressivement from scratch en Kotlin/JVM. Chaque PR introduit un concept exécutable, testé et documenté.
 
+## PR05 - Observer embeddings, RMSNorm et RoPE
+
+PR05 introduit DJL/PyTorch et les premiers tenseurs entraînables :
+
+```powershell
+.\gradlew.bat run --args="model components --vocab-size 32 --d-model 8 --num-heads 2 --batch-size 2 --sequence-length 4 --context-length 16 --rope-theta 10000 --seed 42"
+```
+
+La commande affiche les formes `[B,T,C]` et `[B,H,T,D]`, une rotation RoPE calculable, les normes de gradients et la fermeture du `NDManager`. Consulte la [note de laboratoire PR05](docs/lab-notes/pr-05-embeddings-rmsnorm-rope.md) pour les expériences.
+
 ## PR04 - Inspecter les séquences d'entraînement
 
 Observe d'abord le décalage next-token sans tokenizer :

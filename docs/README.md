@@ -13,6 +13,9 @@ Ce dossier accompagne le code dans l'ordre où les concepts sont construits. Ne 
 7. [PR03 : entraîner et inspecter un byte-level BPE](lab-notes/pr-03-byte-level-bpe.md)
 8. [Dataset, fenêtres et batches](04-dataset-and-sequences.md)
 9. [PR04 : construire les séquences d'entraînement](lab-notes/pr-04-dataset-and-sequences.md)
-10. [Plan complet des PR](plan-directeur.md)
+10. [Embeddings, RMSNorm et RoPE](05-embeddings-rmsnorm-rope.md)
+11. [Gestion de la mémoire native DJL](architecture/djl-memory-management.md)
+12. [PR05 : premiers tenseurs et gradients](lab-notes/pr-05-embeddings-rmsnorm-rope.md)
+13. [Plan complet des PR](plan-directeur.md)
 
 Les chapitres sur les données, tenseurs, attention et entraînement seront ajoutés avec leur implémentation. Un document ne prétendra jamais qu'un composant fonctionne avant que sa PR fournisse les tests correspondants.

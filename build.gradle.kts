@@ -11,9 +11,14 @@ repositories {
 }
 
 dependencies {
+    implementation(platform("ai.djl:bom:0.36.0"))
+    implementation("ai.djl:api")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.20.0")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.20.0")
     implementation("info.picocli:picocli:4.7.7")
+
+    runtimeOnly("ai.djl.pytorch:pytorch-engine")
+    runtimeOnly("org.slf4j:slf4j-simple:2.0.18")
 
     testImplementation(platform("org.junit:junit-bom:5.13.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")
@@ -31,4 +36,11 @@ application {
 
 tasks.test {
     useJUnitPlatform()
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+    systemProperty("org.slf4j.simpleLogger.defaultLogLevel", "error")
+}
+
+tasks.withType<JavaExec>().configureEach {
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+    systemProperty("org.slf4j.simpleLogger.defaultLogLevel", "error")
 }

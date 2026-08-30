@@ -1,6 +1,6 @@
 # Plan directeur de `lxp-mini-1xm`
 
-> Statut : PR01 à PR03 terminées; PR04 implémentée sur `feature/pr04-streaming-dataset`
+> Statut : PR01 à PR04 terminées; PR05 implémentée sur `feature/pr05-embeddings-rmsnorm-rope`
 > Source de vérité initiale : [`docs2/project.md`](../docs2/project.md)  
 > Dernière mise à jour : 2026-08-29
 
@@ -209,7 +209,7 @@ Gradle supporte officiellement Java 25 à partir de 9.1.0. La version du wrapper
 | `ai.djl.pytorch:pytorch-engine` | PR05 | backend numérique PyTorch |
 | SLF4J simple ou Logback | PR01/PR09 | logs CLI puis métriques d'entraînement |
 
-DJL recommande son BOM; au moment de ce plan, la documentation présente `0.36.0` ([BOM DJL](https://djl.ai/bom/)). La version devra être vérifiée et verrouillée au moment où DJL entre réellement dans PR05, plutôt que d'ajouter dès PR01 une dépendance native inutilisée. Le moteur PyTorch peut télécharger ses bibliothèques natives au premier lancement; une variante native explicite sera documentée pour les environnements hors ligne ([moteur PyTorch DJL](https://djl.ai/engines/pytorch/pytorch-engine/)).
+PR05 a vérifié et verrouillé le BOM DJL `0.36.0`, `ai.djl:api` et `pytorch-engine`. Le moteur PyTorch télécharge automatiquement les bibliothèques natives adaptées au premier lancement; les environnements hors ligne devront ajouter les artefacts natifs correspondant explicitement à leur plateforme ([BOM DJL](https://docs.djl.ai/master/bom/index.html), [moteur PyTorch DJL](https://djl.ai/engines/pytorch/pytorch-engine/)).
 
 ### 5.3 Pourquoi ne pas ajouter davantage
 
@@ -351,6 +351,8 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 ### PR05 - Embeddings, RMSNorm et RoPE
 
 **Construire :** première intégration DJL/PyTorch, table d'embeddings, RMSNorm explicite et RoPE explicite.
+
+**Commande exécutable :** `model components` montre les formes, paramètres, rotations, gradients et la fermeture du scope natif sur CPU.
 
 **Tests :** formes, valeur RMSNorm connue, rotation RoPE connue, gradients et fermeture correcte des `NDManager`.
 
