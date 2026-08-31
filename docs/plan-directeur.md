@@ -544,7 +544,7 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 
 #### PR16 - Serveur HTTP et OpenAI-compatible completions
 
-**Construire :** serveur Kotlin léger (Ktor à évaluer au début de la PR), binding `127.0.0.1` par défaut, `GET /health`, `GET /v1/models`, `GET /v1/models/{model}`, `POST /v1/completions`, erreurs JSON cohérentes et comptage `usage`.
+**Construire :** serveur Kotlin léger (Ktor à évaluer au début de la PR, mais réelle préférence pour Spring Boot), binding `127.0.0.1` par défaut, `GET /health`, `GET /v1/models`, `GET /v1/models/{model}`, `POST /v1/completions`, erreurs JSON cohérentes et comptage `usage`.
 
 **Compatibilité :** implémenter seulement les champs qui ont une traduction réelle vers le runtime (`model`, `prompt`, limite de génération, température, top-p, seed/stop lorsque supportés). Les champs inconnus ou non supportés ne doivent pas être silencieusement ignorés.
 
