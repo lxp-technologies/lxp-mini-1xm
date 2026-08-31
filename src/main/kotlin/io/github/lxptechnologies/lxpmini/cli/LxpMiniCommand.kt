@@ -19,6 +19,7 @@ import java.util.concurrent.Callable
         TrainCommand::class,
         GenerateCommand::class,
         EvaluateCommand::class,
+        ExperimentCommand::class,
     ],
 )
 class LxpMiniCommand : Runnable {

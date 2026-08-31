@@ -37,7 +37,7 @@ class TokenEmbedding(
             throw TensorShapeException("Token IDs must have shape [B, T], got ${tokenIds.shape}")
         }
         val weight = parameterStore.getValue(weightParameter, tokenIds.device, training)
-        return NDList(weight.get(NDIndex("{}", tokenIds)))
+        return NDList(weight.get(tokenIds.manager, NDIndex("{}", tokenIds)))
     }
 
     override fun getOutputShapes(inputShapes: Array<Shape>): Array<Shape> {

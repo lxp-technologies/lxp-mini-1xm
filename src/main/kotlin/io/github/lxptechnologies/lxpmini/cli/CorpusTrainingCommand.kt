@@ -27,6 +27,7 @@ import io.github.lxptechnologies.lxpmini.data.TokenBatchReader
 import io.github.lxptechnologies.lxpmini.data.asSequence
 import io.github.lxptechnologies.lxpmini.evaluation.EvaluationException
 import io.github.lxptechnologies.lxpmini.evaluation.EvaluationMetrics
+import io.github.lxptechnologies.lxpmini.evaluation.EvaluationResourceSnapshot
 import io.github.lxptechnologies.lxpmini.evaluation.LanguageModelEvaluator
 import io.github.lxptechnologies.lxpmini.generation.AutoregressiveGenerator
 import io.github.lxptechnologies.lxpmini.generation.GenerationException
@@ -93,6 +94,12 @@ class CorpusTrainingCommand(
 
     @Option(names = ["--max-validation-batches"], defaultValue = "0", description = ["0 evaluates all batches."])
     var maxValidationBatches: Int = 0
+
+    @Option(
+        names = ["--trace-evaluation-resources"],
+        description = ["Print managed NDArray counts before evaluation and after every closed validation batch."],
+    )
+    var traceEvaluationResources: Boolean = false
 
     @Option(names = ["--prompt"], paramLabel = "<text>", description = ["Repeat for fixed sample prompts."])
     var prompts: Array<String> = emptyArray()
@@ -182,7 +189,11 @@ class CorpusTrainingCommand(
                 val shape = Shape(config.training.batchSize.toLong(), config.model.contextLength.toLong())
                 model.initialize(manager, DataType.FLOAT32, shape)
                 val trainer = LanguageModelTrainer(model, manager, config.training, updates)
-                val evaluator = LanguageModelEvaluator(model, manager)
+                val evaluator = LanguageModelEvaluator(
+                    model,
+                    manager,
+                    resourceObserver = if (traceEvaluationResources) ::printEvaluationResources else null,
+                )
                 val startedAt = System.nanoTime()
                 var epoch = 0
                 var trainBatches = dataset.trainBatches(shuffleBufferSize, epochSeed(config.training.seed, epoch))
@@ -274,6 +285,13 @@ class CorpusTrainingCommand(
                 if (maxValidationBatches == 0) Int.MAX_VALUE else maxValidationBatches,
             )
         }
+
+    private fun printEvaluationResources(snapshot: EvaluationResourceSnapshot) {
+        println(
+            "evaluation-resources completed-batches=${snapshot.completedBatches} " +
+                "managed-arrays=${snapshot.managedArrayCount}",
+        )
+    }
 
     private fun writeSamples(
         model: DecoderLanguageModel,

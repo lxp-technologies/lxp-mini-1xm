@@ -1,0 +1,36 @@
+# Training-friendly 17.3M TinyStories preset.
+#
+# The original mini-17m preset uses vocabSize=8192 and ffnDim=1024.
+# PR12's pedagogical BPE trainer rescans the full corpus once per merge,
+# so an 8192-token vocabulary is not yet practical on a sizeable corpus.
+#
+# This preset moves the saved embedding parameter budget into the FFN:
+#   embeddings: 512 * 384 = 196,608
+#   attention:                 4,718,592
+#   SwiGLU FFN (ffn=1344):    12,386,304
+#   RMSNorm:                       6,528
+#   tied LM head:                       0
+#   total:                     17,308,032
+#
+# Same total parameter count as configs/mini-17m.yaml, different allocation.
+model:
+  vocabSize: 512
+  contextLength: 256
+  dModel: 384
+  numLayers: 8
+  numHeads: 6
+  ffnDim: 1344
+  ropeTheta: 10000.0
+  dropout: 0.0
+  tieEmbeddings: true
+training:
+  batchSize: 8
+  gradientAccumulationSteps: 1
+  learningRate: 0.0003
+  minLearningRate: 0.00003
+  warmupSteps: 0
+  weightDecay: 0.1
+  beta1: 0.9
+  beta2: 0.95
+  gradientClipNorm: 1.0
+  seed: 42

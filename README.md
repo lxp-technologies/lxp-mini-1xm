@@ -2,6 +2,17 @@
 
 Petit modèle de langage decoder-only construit progressivement from scratch en Kotlin/JVM. Chaque PR introduit un concept exécutable, testé et documenté.
 
+## Correctif bloquant avant PR13 - Mémoire native DJL
+
+Le forward attache maintenant tous ses tenseurs temporaires au manager du batch, jamais au manager longue durée des paramètres. Pour reproduire le diagnostic 17,3 M avec 20 batches de validation :
+
+```powershell
+$runDir = "build/labs/pr13-fix/val20-$(Get-Date -Format yyyyMMdd-HHmmss)"
+.\gradlew.bat run --args="train corpus --config configs/diagnostic-17m-b16-t256.yaml --tokenizer artifacts/tokenizers/tinystories-en/bpe-512.json --train-corpus data/prepared/tinystories-en/train.txt --validation-corpus data/prepared/tinystories-en/validation.txt --run-dir $runDir --updates 2 --eval-every 100 --checkpoint-every 100 --shuffle-buffer 32 --max-validation-batches 20 --trace-evaluation-resources --prompt Lily --sample-tokens 1"
+```
+
+Chaque série `evaluation-resources` doit rester plate après fermeture des batches. Le diagnostic de référence conserve exactement `90` arrays pour les batches `0..20` des deux évaluations. Consulte la [gestion mémoire DJL](docs/architecture/djl-memory-management.md) et le [laboratoire du correctif](docs/lab-notes/pr-13-djl-manager-lifetime-fix.md).
+
 ## PR12 - Entraîner et évaluer un tiny corpus
 
 Entraîne le BPE uniquement sur le corpus train, puis lance un run mesuré avec validation séparée, checkpoints et prompts fixes :

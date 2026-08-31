@@ -1,6 +1,6 @@
 # Plan directeur de `lxp-mini-1xm`
 
-> Statut : PR01 à PR11 terminées; PR12 implémentée sur `feature/pr12-evaluation-tiny-corpus`
+> Statut : PR01 à PR12 terminées; stabilisation de la mémoire native DJL en cours avant PR13; trajectoire post-PR13 planifiée jusqu'au chatbot, à l'alignement et aux expériences MoE
 > Source de vérité initiale : [`docs2/project.md`](../docs2/project.md)  
 > Dernière mise à jour : 2026-08-30
 
@@ -34,7 +34,12 @@ flowchart LR
     P9 --> P10[PR10<br/>Checkpoints]
     P10 --> P11[PR11<br/>Génération]
     P11 --> P12[PR12<br/>Évaluation]
-    P12 --> P13[PR13<br/>Expériences d'échelle]
+    P12 --> FIX[Correctif<br/>mémoire native DJL]
+    FIX --> P13[PR13<br/>Expériences d'échelle]
+    P13 --> SERVE[PR14-17<br/>Inference + API]
+    SERVE --> CHAT[PR18-23<br/>Contexte + Chat + SFT]
+    CHAT --> ALIGN[PR24-27<br/>Préférences + RLHF]
+    ALIGN --> MOE[PR28-30<br/>MoE]
 ```
 
 ## 2. Périmètre
@@ -57,7 +62,7 @@ flowchart LR
 - serveur HTTP, interface Web et déploiement en production;
 - promesse de conversation, de factualité ou de raisonnement comparable à un grand LLM.
 
-Ces exclusions protègent la lisibilité. Elles pourront devenir des expériences après PR13, jamais des dépendances cachées du parcours principal.
+Ces exclusions protègent la lisibilité de PR01 à PR13. La trajectoire post-PR13 ci-dessous réintroduit volontairement certaines d'entre elles dans un ordre pédagogique : d'abord servir correctement le modèle dense, ensuite lui apprendre le format conversationnel et l'instruction following, puis expérimenter l'alignement par préférences et enfin MoE. Elles ne deviennent jamais des dépendances cachées des fondations.
 
 ## 3. Architecture cible
 
@@ -132,6 +137,49 @@ flowchart TB
 
 Les dépendances vont vers le coeur, jamais vers la CLI. Les objets de configuration et le calcul théorique des paramètres ne dépendent pas de DJL. Ce découplage permet de tester PR01 sans télécharger de bibliothèque native PyTorch.
 
+### 3.4 Architecture cible après PR13 : inference, API et chat
+
+Le serveur HTTP reste un adaptateur autour d'un runtime d'inférence réutilisable. Le coeur du modèle ne doit jamais connaître HTTP, JSON, OpenAI ni les rôles `system/user/assistant`.
+
+```mermaid
+flowchart LR
+    SDK[Client / OpenAI SDK] --> HTTP[Serveur HTTP Kotlin]
+    HTTP --> OA[Adaptateurs API
+completions / chat / responses]
+    OA --> CT[ChatTemplateRenderer]
+    OA --> RT[InferenceRuntime]
+    CT --> RT
+    RT --> TOK[Tokenizer]
+    RT --> MODEL[DecoderLanguageModel]
+    RT --> KV[KV cache optionnel]
+    MODEL --> SAMPLER[TokenSampler]
+    SAMPLER --> HTTP
+```
+
+Règle de séparation :
+
+- `InferenceRuntime` charge une fois le tokenizer, la configuration et le checkpoint, puis expose une API Kotlin indépendante du transport;
+- les adaptateurs OpenAI traduisent seulement des contrats JSON vers des appels au runtime;
+- le `ChatTemplateRenderer` transforme une liste de messages en texte/tokens;
+- le rôle `system` n'est **pas** un canal magique à l'intérieur du Transformer : il devient des tokens. Le modèle doit avoir été entraîné à donner un sens particulier à ce format;
+- un modèle `base` peut être exposé via HTTP, mais il ne doit pas être présenté comme un bon modèle de chat avant SFT et évaluation;
+- chaque requête d'inférence possède son propre scope de ressources natives; les poids et caches explicitement persistants seulement vivent au niveau du runtime.
+
+#### Sous-ensemble OpenAI-compatible visé
+
+Le projet vise une **compatibilité documentée par sous-ensemble**, jamais la prétention d'implémenter toute l'API OpenAI.
+
+| Endpoint | Phase | But |
+|---|---:|---|
+| `GET /health` | PR16 | santé locale, hors contrat OpenAI |
+| `GET /v1/models` | PR16 | exposer les modèles/checkpoints disponibles |
+| `GET /v1/models/{model}` | PR16 | métadonnées d'un modèle |
+| `POST /v1/completions` | PR16 | completion texte du modèle base; endpoint OpenAI historique/legacy |
+| `POST /v1/chat/completions` | PR20 | messages `system/user/assistant` vers chat template |
+| `POST /v1/responses` | PR23 | sous-ensemble moderne unifié, après stabilisation du chat |
+
+`/v1/embeddings`, audio, images, outils hébergés et autres ressources ne sont pas simulés. Une absence de capacité réelle doit produire une erreur claire plutôt qu'une fausse compatibilité.
+
 ## 4. Arborescence proposée
 
 PR01 crée uniquement les éléments nécessaires aux fondations. Les dossiers marqués « futur » apparaîtront dans la PR qui les utilise, pas sous forme de classes vides.
@@ -178,9 +226,14 @@ Arborescence logique future sous `io.github.lxptechnologies.lxpmini` :
 tokenizer/   # PR02-03
 data/        # PR04
 model/       # PR05-08
-training/    # PR09-10
+training/    # PR09-10 puis SFT/alignment
 generation/  # PR11
-evaluation/  # PR12
+evaluation/  # PR12 puis chat/alignment evals
+inference/   # PR14-15
+server/      # PR16-17
+chat/        # PR18-23
+alignment/   # PR24-27
+moe/         # PR28-30
 ```
 
 ## 5. Outils et dépendances minimales
@@ -297,6 +350,19 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 | FP16/BF16                            |                après PR12 | gain mesuré, stabilité démontrée                      |
 | Dataset principal et langue          | avant le premier long run | licence, qualité, taille et objectif linguistique     |
 | Budget final de tokens               |                      PR12 | courbes de validation et budget matériel              |
+
+### 7.3 Décisions de trajectoire post-PR13
+
+| Décision | Pourquoi | Conséquence |
+|---|---|---|
+| Runtime d'inférence avant HTTP | éviter que le serveur devienne le propriétaire du modèle | CLI, tests et serveur réutilisent le même moteur |
+| KV cache avant le vrai chatbot | éviter de recalculer tout le préfixe à chaque token | cache par couche et par conversation/requête, avec lifecycle explicite |
+| Compatibilité OpenAI par sous-ensemble | les SDK attendent des contrats précis, mais notre 17 M ne possède pas toutes les capacités OpenAI | endpoints et champs supportés sont versionnés et testés |
+| `system` est un format appris | un Transformer base ne possède aucune hiérarchie de rôles intrinsèque | chat template + SFT doivent précéder toute promesse d'obéissance au system prompt |
+| SFT avant préférence/RLHF | apprendre d'abord à répondre avant d'optimiser des préférences | modèle `base` puis checkpoint `instruct` distinct |
+| DPO avant PPO-RLHF | introduire les préférences avec moins de pièces mobiles | reward model et PPO deviennent une expérience avancée, pas un prérequis |
+| MoE après une baseline dense de chat | conserver un contrôle dense compréhensible | comparaison dense/MoE à données et compute documentés |
+| Contexte 512/1024 mesuré, pas supposé | RoPE rend l'extension possible techniquement mais pas automatiquement bonne | continued pretraining/evals obligatoires avant d'annoncer une fenêtre plus grande |
 
 ## 8. Plan des PR
 
@@ -434,6 +500,16 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 
 **Critère de sortie :** la décision de passer au 17 M est fondée sur des sanity tests verts et des mesures.
 
+### Correctif bloquant avant PR13 - Stabilisation mémoire native DJL
+
+**Construire :** audit systématique des lifetimes `NDManager` pendant entraînement, validation et génération; correction des sorties temporaires qui s'attachent au manager longue durée; instrumentation et soak tests.
+
+**Reproduction actuelle :** le 17,3 M survit à `B=16,T=256,accumulation=4`, ainsi qu'à une validation courte, mais une évaluation répétée peut provoquer un `EXCEPTION_ACCESS_VIOLATION` dans `c10.dll`.
+
+**Tests :** 100+ forwards/evaluations successifs sur petit modèle, compte de ressources natives stable, validation 17 M répétée sans croissance monotone ni crash.
+
+**Critère de sortie :** aucun long run PR13 tant que la mémoire native n'atteint pas un plateau stable et que les managers temporaires ne sont pas prouvés libérés.
+
 ### PR13 - Expériences d'échelle
 
 **Construire :** matrice d'expériences 10-22 M faisant varier une seule dimension importante à la fois.
@@ -441,6 +517,190 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 **Mesurer :** paramètres, mémoire, tokens/s, train/validation loss, qualité qualitative et contexte.
 
 **Critère de sortie :** conclusions empiriques reproductibles, sans présenter un seul run comme une loi générale.
+
+### Phase 2 - Servir le modèle dense
+
+#### PR14 - Inference Runtime
+
+**Construire :** `InferenceRuntime` chargé une seule fois avec config, tokenizer et checkpoint; API Kotlin `complete()`/`generate()`; modèle `base` identifié par un ID stable; limites de concurrence explicites.
+
+**Tests :** chargement unique, logits/génération identiques à la CLI PR11, fermeture propre, requêtes successives sans croissance mémoire.
+
+**Expérience :** comparer 100 générations via CLI historique et runtime réutilisé.
+
+**Critère de sortie :** aucune connaissance HTTP dans `model/`, `generation/` ou le coeur du runtime.
+
+#### PR15 - KV cache et gestion du contexte
+
+**Construire :** cache K/V par couche pour le décodage autoregressif, invalidation et lifecycle; politique de dépassement de contexte; métriques prefill vs decode.
+
+**Tests :** logits du décodage caché équivalents au recalcul complet dans une tolérance documentée; cache isolé entre requêtes.
+
+**Expérience :** mesurer tokens/s avec et sans KV cache sur 32, 64 et 128 nouveaux tokens.
+
+**Critère de sortie :** le gain est mesuré et aucune requête ne peut lire le cache d'une autre.
+
+#### PR16 - Serveur HTTP et OpenAI-compatible completions
+
+**Construire :** serveur Kotlin léger (Ktor à évaluer au début de la PR), binding `127.0.0.1` par défaut, `GET /health`, `GET /v1/models`, `GET /v1/models/{model}`, `POST /v1/completions`, erreurs JSON cohérentes et comptage `usage`.
+
+**Compatibilité :** implémenter seulement les champs qui ont une traduction réelle vers le runtime (`model`, `prompt`, limite de génération, température, top-p, seed/stop lorsque supportés). Les champs inconnus ou non supportés ne doivent pas être silencieusement ignorés.
+
+**Tests :** contract tests JSON, mauvais modèle, prompt trop long, paramètres invalides, comparaison API vs runtime direct.
+
+**Expérience :** configurer un client OpenAI-compatible avec `base_url=http://127.0.0.1:<port>/v1` et obtenir une completion de `lxp-mini-1xm-17m-base`.
+
+#### PR17 - Streaming SSE
+
+**Construire :** `stream=true`, chunks au fil des tokens, terminaison propre, annulation client et libération immédiate du scope d'inférence.
+
+**Tests :** ordre des chunks, texte final équivalent au non-streaming à seed/stratégie compatibles, client disconnect sans fuite.
+
+**Expérience :** afficher la génération token par token depuis `curl` ou un petit client Kotlin.
+
+**Critère de sortie :** streaming stable sur des centaines de générations successives.
+
+### Phase 3 - Transformer le base model en chatbot
+
+#### PR18 - Extension de contexte contrôlée
+
+**Construire :** expériences `256 -> 512 -> 1024`, continued pretraining si nécessaire, validation des caches RoPE et politiques de troncature.
+
+**Important :** augmenter `contextLength` dans YAML ne suffit pas à affirmer que le modèle sait exploiter ce contexte. La qualité doit être mesurée sur des dépendances longues.
+
+**Expérience :** même checkpoint/config de contrôle, mêmes données, prompts nécessitant une information située à différentes distances.
+
+**Critère de sortie :** choisir une fenêtre de travail pour le chatbot sur preuve; 512 est la première cible raisonnable, 1024 une expérience, pas une promesse.
+
+#### PR19 - Chat template et sémantique du system prompt
+
+**Construire :** `ChatMessage(role, content)`, rôles `system/user/assistant`, `ChatTemplateRenderer`, marqueurs de tours, EOS/stop et budget de contexte.
+
+Exemple conceptuel :
+
+```text
+<|system|>
+You are concise and friendly.
+<|user|>
+Hello!
+<|assistant|>
+```
+
+Les marqueurs peuvent d'abord être encodés avec le byte-level BPE existant afin de préserver la compatibilité du checkpoint. Une expérience séparée pourra mesurer l'intérêt de tokens de rôle dédiés; les ajouter au vocabulaire change la forme des embeddings et exige une migration/retraining explicite.
+
+**Leçon centrale :** un system prompt n'a aucun privilège mathématique automatique. Pour le Transformer, ce sont des tokens supplémentaires. Il devient utile lorsque le modèle a appris pendant SFT que le format `system -> user -> assistant` possède une signification particulière.
+
+**Tests :** rendu déterministe, ordre des rôles, échappement, budget de tokens, troncature qui ne coupe pas arbitrairement un marqueur de tour.
+
+#### PR20 - `POST /v1/chat/completions`
+
+**Construire :** adaptateur `messages[] -> ChatTemplateRenderer -> InferenceRuntime`, réponse `assistant`, usage, stop, non-streaming et streaming en réutilisant PR17.
+
+**Tests :** `system/user/assistant`, historique multi-tour, prompt trop long, message invalide, contrat compatible avec les clients ciblés.
+
+**Expérience :** brancher le modèle **base** comme chatbot avant SFT et conserver les résultats comme baseline volontairement médiocre.
+
+**Critère de sortie :** compatibilité protocolaire prouvée, sans confondre compatibilité HTTP et qualité conversationnelle.
+
+#### PR21 - Supervised Fine-Tuning (SFT) / modèle Instruct
+
+**Construire :** dataset conversationnel versionné, rendu avec exactement le même chat template que l'inférence, entraînement sur réponses assistant, masking optionnel de la loss sur les tokens `system/user`, checkpoint `lxp-mini-1xm-17m-instruct`.
+
+**Tests :** labels/mask exacts, aucun apprentissage involontaire sur padding, overfit d'une mini-conversation, checkpoint base conservé intact.
+
+**Expérience :** comparer `base` vs `instruct` sur les mêmes 20 conversations et plusieurs system prompts.
+
+**Critère de sortie :** le modèle répond dans le bon tour et démontre un gain mesurable d'instruction following.
+
+#### PR22 - CLI Chat et évaluation conversationnelle
+
+**Construire :** `chat` interactif, historique local, compteur de contexte, stratégie de troncature, suite d'evals multi-tour et system-prompt adherence.
+
+**Mesurer :** cohérence de rôle, suivi d'instructions simples, répétition, oubli à longue distance, sensibilité à la température et limites dues au petit modèle.
+
+**Critère de sortie :** nous pouvons utiliser `lxp-mini-1xm-17m-instruct` comme chatbot local tout en documentant clairement ses limites.
+
+#### PR23 - Sous-ensemble `POST /v1/responses`
+
+**Construire :** adaptateur minimal vers le même runtime/chat template, texte input/output et streaming lorsque la sémantique est réellement supportée.
+
+**Principe :** ne pas réimplémenter artificiellement les outils, multimodalités ou états serveur de l'API OpenAI. Retourner une erreur `unsupported_feature` documentée lorsqu'un client demande une capacité absente.
+
+**Critère de sortie :** tests d'intégration avec au moins un client ciblé et documentation exacte du sous-ensemble.
+
+### Phase 4 - Alignement par préférences
+
+#### PR24 - Dataset de préférences et évaluateur pairwise
+
+**Construire :** exemples `(prompt, chosen, rejected)`, provenance, split, CLI d'inspection, métriques pairwise.
+
+**Expérience :** créer d'abord un dataset minuscule et synthétique où la préférence est évidente et vérifiable.
+
+**Critère de sortie :** aucune optimisation de préférence avant d'avoir prouvé que les paires et leurs masks sont corrects.
+
+#### PR25 - DPO (Direct Preference Optimization)
+
+**Construire :** modèle de référence gelé, log-probabilities chosen/rejected, loss DPO, coefficient `beta`, entraînement et évaluation avant/après.
+
+**Pourquoi avant PPO :** DPO permet d'étudier l'apprentissage par préférences sans introduire immédiatement reward model, rollout policy et boucle RL complète.
+
+**Critère de sortie :** préférence pairwise améliorée sans effondrement manifeste de la qualité de base.
+
+#### PR26 - Reward Model
+
+**Construire :** tête/scoring de récompense ou architecture explicitement choisie, entraînement pairwise, calibration et validation hors train.
+
+**Expérience :** vérifier si le reward model classe correctement des paires synthétiques puis réelles; mesurer les erreurs plutôt que supposer le score fiable.
+
+**Critère de sortie :** reward accuracy documentée et résistance minimale au surapprentissage.
+
+#### PR27 - RLHF classique avec PPO, expérimental
+
+**Construire :** policy, reference model, reward model, génération de rollouts, KL penalty, advantage/returns et update PPO dans une implémentation volontairement petite et inspectable.
+
+**Important :** RLHF n'est pas requis pour appeler le modèle `instruct`. À 17 M, PPO peut être instable ou dégrader le modèle; un résultat négatif est une conclusion expérimentale valide.
+
+**Critère de sortie :** aucune affirmation d'amélioration sans comparaison SFT, DPO et PPO sur la même suite d'evals.
+
+### Phase 5 - Mixture of Experts
+
+#### PR28 - MoE top-1 minimal
+
+**Construire :** remplacer certains FFN SwiGLU par `Router + N experts SwiGLU`, logits de routing, top-1 dispatch/recomposition et compte `paramètres totaux` vs `paramètres actifs par token`.
+
+**Tests :** routing déterministe sur exemple synthétique, shapes, gradients vers router/expert sélectionné, aucun token perdu.
+
+**Expérience :** 4 experts, top-1, même `dModel` et attention que la baseline dense.
+
+#### PR29 - MoE top-2 et load balancing
+
+**Construire :** top-2 pondéré, métriques d'utilisation des experts, détection d'expert collapse, auxiliary load-balancing loss et éventuellement capacité par expert si nécessaire.
+
+**Mesurer :** distribution des tokens, overflow éventuel, loss principale, loss auxiliaire, mémoire et débit.
+
+**Critère de sortie :** aucun expert silencieusement mort sans que les métriques le révèlent.
+
+#### PR30 - Dense vs MoE
+
+**Construire :** expérience reproductible comparant une baseline dense et une variante MoE sous plusieurs budgets : paramètres totaux, paramètres actifs/token et compute approximatif.
+
+**Mesurer :** train/validation loss, tokens/s, RAM/VRAM, qualité base et chat après adaptation comparable.
+
+**Critère de sortie :** expliquer empiriquement si MoE apporte quelque chose à cette échelle; « non » est une conclusion parfaitement acceptable.
+
+### Expériences avancées non numérotées à ce stade
+
+Une fois PR30 atteinte, les sujets suivants peuvent devenir des branches pédagogiques indépendantes plutôt qu'une obligation linéaire :
+
+- BF16/FP16 et mixed precision;
+- quantification d'inférence;
+- LoRA/PEFT pour comparer un fine-tuning partiel au SFT complet;
+- GQA;
+- distillation;
+- speculative decoding;
+- tool/function calling avec format contraint, seulement si le modèle démontre qu'il peut apprendre de façon fiable le protocole;
+- contexte supérieur à 1024 et variantes RoPE;
+- export vers un format d'inférence externe si cela reste compatible avec l'objectif Kotlin-first.
 
 ## 9. Comment entraîner le modèle
 
@@ -568,6 +828,55 @@ Depuis PR11, la génération à partir d'un run PR10 et d'un tokenizer compatibl
 
 Le format PR10 restaure les poids, le compteur, les tokens vus et le scheduler, mais pas les moments AdamW ni l'état RNG. Il porte donc explicitement `exactTrainingResume=false`. PR12 crée des runs frais et compare leurs checkpoints; la future commande générale `train --resume` ne devra être annoncée exacte que si poids, moments AdamW, scheduler, step et états aléatoires sont tous restaurés.
 
+### 9.7 Du modèle base au chatbot
+
+Le chemin cible est explicitement séparé en quatre artefacts conceptuels :
+
+```text
+pretraining corpus
+      ↓
+lxp-mini-1xm-17m-base
+      ↓ SFT conversationnel
+lxp-mini-1xm-17m-instruct
+      ↓ préférence optionnelle
+lxp-mini-1xm-17m-dpo / rlhf
+      ↓ servi par le même runtime
+OpenAI-compatible API
+```
+
+Le `system prompt` appartient au **contexte de requête**, pas aux poids. Les poids apprennent pendant SFT comment interpréter son emplacement et ses marqueurs. Changer le system prompt ne réentraîne donc pas le modèle; changer le **chat template** après SFT peut en revanche briser le comportement appris.
+
+Exemple de requête cible après PR20 :
+
+```json
+{
+  "model": "lxp-mini-1xm-17m-instruct",
+  "messages": [
+    {"role": "system", "content": "You are concise and friendly."},
+    {"role": "user", "content": "Tell me a tiny story about a dog."}
+  ],
+  "temperature": 0.8,
+  "max_tokens": 64,
+  "stream": false
+}
+```
+
+Le serveur doit convertir cette requête en **exactement le même format** que celui employé pour les exemples SFT. L'objectif pédagogique est de pouvoir suivre la chaîne entière :
+
+```text
+messages JSON
+  -> chat template
+  -> BPE token IDs
+  -> context window
+  -> Transformer
+  -> logits
+  -> sampling
+  -> assistant tokens
+  -> JSON/SSE
+```
+
+Le modèle 17 M restera limité. Le but du mode chatbot est d'apprendre la mécanique complète et de mesurer ce qu'un petit modèle peut réellement faire, pas de masquer ses limites avec une couche HTTP.
+
 ## 10. Matériel, mémoire et durée
 
 Les poids FP32 occupent environ `17 308 032 × 4 = 69,2 MB`. Pendant AdamW, il faut aussi compter gradients, deux moments de l'optimizer, activations, buffers temporaires et mémoire native du moteur. La mémoire réelle est donc très supérieure aux seuls poids et dépend du batch, du contexte et de l'implémentation.
@@ -620,6 +929,21 @@ Le modèle minimise la moyenne de :
 
 Il ne mémorise pas une réponse associée à chaque phrase. Il ajuste ses poids afin d'augmenter la probabilité du vrai prochain token dans les contextes observés.
 
+Après PR13, une seconde chaîne s'ajoute sans modifier cette définition fondamentale du modèle :
+
+```mermaid
+flowchart LR
+    BASE[Base checkpoint] --> SFT[SFT conversationnel]
+    SFT --> INST[Instruct checkpoint]
+    INST --> PREF[Préférences
+DPO / RLHF optionnel]
+    INST --> SERVE[InferenceRuntime]
+    PREF --> SERVE
+    SERVE --> TEMPLATE[Chat template]
+    TEMPLATE --> API[OpenAI-compatible API]
+    API --> CLIENT[CLI chat / SDK / LLM gateway]
+```
+
 ## 12. Validation et discipline expérimentale
 
 ### Pyramide obligatoire
@@ -648,6 +972,11 @@ La perplexité vaut `exp(loss)` pour une cross-entropy moyenne en logarithme nat
 | Non-déterminisme GPU | résultats différents à seed fixe | consigner engine/device et tolérances |
 | Dépendances natives fragiles | échec au premier lancement | verrouillage, CI CPU, procédure offline |
 | Ambition trop rapide | long run avant sanity checks | portes de sortie explicites par PR |
+| Fausse compatibilité OpenAI | SDK accepte l'URL mais un champ est ignoré | matrice de compatibilité et erreurs `unsupported_feature` |
+| System prompt inefficace | le modèle continue le texte au lieu de suivre le rôle | même chat template en SFT et inference + evals dédiées |
+| Oubli conversationnel | tours anciens hors fenêtre | compteur de tokens, politique de troncature et contexte mesuré |
+| Reward hacking / régression | score préférence monte, qualité générale baisse | evals indépendantes et comparaison SFT/DPO/PPO |
+| Expert collapse MoE | un ou deux experts reçoivent presque tout | métriques de routing + load-balancing loss |
 
 ## 14. Definition of Done de PR01
 
@@ -672,12 +1001,19 @@ Ces questions ne bloquent pas PR01 :
 3. Quelle licence voulons-nous pour le code, les futurs poids et le tokenizer?
 4. Quel budget maximal de temps, d'électricité et de stockage acceptons-nous par expérience?
 5. Voulons-nous publier les poids, ce qui impose une traçabilité stricte des licences du corpus?
+6. Quelle fenêtre de contexte cible voulons-nous pour le premier chatbot : 512 ou 1024 après mesure?
+7. Quel corpus SFT conversationnel peut être utilisé avec une provenance et une licence suffisamment propres?
+8. Quelle matrice exacte de compatibilité OpenAI voulons-nous garantir à `lxp-llm-gateway` et aux SDKs ciblés?
+9. Les expériences DPO/RLHF doivent-elles produire des poids publiables ou rester strictement des artefacts de laboratoire?
 
 ## 16. Références de départ
 
 - [Matrice de compatibilité Java de Gradle](https://docs.gradle.org/current/userguide/compatibility.html)
 - [DJL : moteurs numériques](https://docs.djl.ai/master/docs/engine.html)
 - [DJL : moteur PyTorch](https://djl.ai/engines/pytorch/pytorch-engine/)
+- [OpenAI API Reference : Chat Completions](https://developers.openai.com/api/reference/resources/chat)
+- [OpenAI API Reference : Responses](https://developers.openai.com/api/reference/resources/responses)
+- [OpenAI API Reference : legacy Completions](https://developers.openai.com/api/reference/resources/completions)
 - [DJL : gestion de la mémoire native](https://docs.djl.ai/master/docs/development/memory_management.html)
 - [TinyStories: How Small Can Language Models Be and Still Speak Coherent English?](https://arxiv.org/abs/2305.07759)
 

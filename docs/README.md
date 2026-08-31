@@ -37,6 +37,9 @@ Ce dossier accompagne le code dans l'ordre où les concepts sont construits. Ne 
 31. [Évaluation et premier tiny corpus](12-evaluation-and-tiny-corpus.md)
 32. [ADR : corpus train/validation explicites et vérifiés](architecture/decisions/0007-explicit-verified-corpus-splits.md)
 33. [PR12 : mesurer avant de passer au 17 M](lab-notes/pr-12-evaluation-and-tiny-corpus.md)
-34. [Plan complet des PR](plan-directeur.md)
+34. [Mémoire native DJL : paramètres et temporaires](architecture/djl-memory-management.md)
+35. [ADR : temporaires du forward possédés par le batch](architecture/decisions/0008-batch-owned-forward-temporaries.md)
+36. [Correctif avant PR13 : soak test des NDManager](lab-notes/pr-13-djl-manager-lifetime-fix.md)
+37. [Plan complet des PR](plan-directeur.md)
 
 Les prochains chapitres seront ajoutés avec leur implémentation. Un document ne prétendra jamais qu'un composant fonctionne avant que sa PR fournisse les tests correspondants.

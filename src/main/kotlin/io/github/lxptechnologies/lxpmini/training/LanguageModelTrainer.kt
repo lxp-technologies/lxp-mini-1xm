@@ -81,59 +81,60 @@ class LanguageModelTrainer(
         if (accumulatedMicroBatches == 0) null else applyOptimizerUpdate(accumulatedMicroBatches)
 
     private fun applyOptimizerUpdate(effectiveMicroBatches: Int): OptimizerUpdateMetrics {
-        if (effectiveMicroBatches < config.gradientAccumulationSteps) {
-            val correction = config.gradientAccumulationSteps.toFloat() / effectiveMicroBatches
-            gradients().forEach { it.muli(correction) }
-        }
-        val gradientNormBeforeClip = globalGradientNorm()
-        if (!gradientNormBeforeClip.isFinite()) {
-            zeroGradients()
+        val gradients = gradientViews()
+        try {
+            if (effectiveMicroBatches < config.gradientAccumulationSteps) {
+                val correction = config.gradientAccumulationSteps.toFloat() / effectiveMicroBatches
+                gradients.forEach { it.gradient.muli(correction) }
+            }
+            val gradientNormBeforeClip = globalGradientNorm(gradients)
+            if (!gradientNormBeforeClip.isFinite()) {
+                zeroGradients(gradients)
+                accumulatedMicroBatches = 0
+                throw TrainingException("Gradient norm is not finite: $gradientNormBeforeClip")
+            }
+            val clipThreshold = config.gradientClipNorm.toFloat()
+            val clipped = gradientNormBeforeClip > clipThreshold
+            if (clipped) {
+                val scale = clipThreshold / gradientNormBeforeClip
+                gradients.forEach { it.gradient.muli(scale) }
+            }
+            val gradientNormAfterClip = if (clipped) clipThreshold else gradientNormBeforeClip
+            val nextUpdate = optimizerUpdates + 1
+            val learningRate = scheduler.learningRateForUpdate(nextUpdate)
+            gradients.forEach { view -> optimizer.update(view.parameter.id, view.parameter.array, view.gradient) }
+            zeroGradients(gradients)
+            optimizerUpdates = nextUpdate
             accumulatedMicroBatches = 0
-            throw TrainingException("Gradient norm is not finite: $gradientNormBeforeClip")
+            return OptimizerUpdateMetrics(
+                updateNumber = optimizerUpdates,
+                learningRate = learningRate,
+                gradientNormBeforeClip = gradientNormBeforeClip,
+                gradientNormAfterClip = gradientNormAfterClip,
+                clipped = clipped,
+                microBatches = effectiveMicroBatches,
+                tokensSeen = tokensSeen,
+            )
+        } finally {
+            gradients.forEach { it.gradient.close() }
         }
-        val clipThreshold = config.gradientClipNorm.toFloat()
-        val clipped = gradientNormBeforeClip > clipThreshold
-        if (clipped) {
-            val scale = clipThreshold / gradientNormBeforeClip
-            gradients().forEach { it.muli(scale) }
-        }
-        val gradientNormAfterClip = if (clipped) clipThreshold else gradientNormBeforeClip
-        val nextUpdate = optimizerUpdates + 1
-        val learningRate = scheduler.learningRateForUpdate(nextUpdate)
-        parameters.forEach { parameter ->
-            val array = parameter.array
-            if (array.hasGradient()) optimizer.update(parameter.id, array, array.gradient)
-        }
-        zeroGradients()
-        optimizerUpdates = nextUpdate
-        accumulatedMicroBatches = 0
-        return OptimizerUpdateMetrics(
-            updateNumber = optimizerUpdates,
-            learningRate = learningRate,
-            gradientNormBeforeClip = gradientNormBeforeClip,
-            gradientNormAfterClip = gradientNormAfterClip,
-            clipped = clipped,
-            microBatches = effectiveMicroBatches,
-            tokensSeen = tokensSeen,
-        )
     }
 
-    private fun globalGradientNorm(): Float {
-        val sumOfSquares = gradients().sumOf { gradient ->
-            gradient.square().use { squared ->
+    private fun globalGradientNorm(gradients: List<GradientView>): Float {
+        val sumOfSquares = gradients.sumOf { view ->
+            view.gradient.square().use { squared ->
                 squared.sum().use { sum -> sum.getFloat().toDouble() }
             }
         }
         return sqrt(sumOfSquares).toFloat()
     }
 
-    private fun gradients(): Sequence<NDArray> = parameters.asSequence()
-        .map { it.array }
-        .filter { it.hasGradient() }
-        .map { it.gradient }
+    private fun gradientViews(): List<GradientView> = parameters.mapNotNull { parameter ->
+        parameter.array.takeIf { it.hasGradient() }?.let { GradientView(parameter, it.gradient) }
+    }
 
-    private fun zeroGradients() {
-        gradients().forEach { it.muli(0f) }
+    private fun zeroGradients(gradients: List<GradientView>) {
+        gradients.forEach { it.gradient.muli(0f) }
     }
 
     private fun requireBatchShapes(inputIds: NDArray, targetIds: NDArray) {
@@ -152,6 +153,8 @@ class LanguageModelTrainer(
         const val EXPECTED_RANK = 2
     }
 }
+
+private data class GradientView(val parameter: Parameter, val gradient: NDArray)
 
 data class MicroBatchMetrics(
     val loss: Float,

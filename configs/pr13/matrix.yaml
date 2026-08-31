@@ -1,0 +1,22 @@
+version: 1
+name: pr13-width-depth-context
+baseline: baseline-14m
+variants:
+  - name: baseline-14m
+    dimension: baseline
+    config: baseline-14m.yaml
+  - name: width-11m
+    dimension: width
+    config: width-11m.yaml
+  - name: depth-18m
+    dimension: depth
+    config: depth-18m.yaml
+  - name: depth-21m
+    dimension: depth
+    config: depth-21m.yaml
+  - name: context-8
+    dimension: context
+    config: context-8.yaml
+  - name: context-32
+    dimension: context
+    config: context-32.yaml
