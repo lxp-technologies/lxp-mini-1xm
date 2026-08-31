@@ -1,0 +1,21 @@
+model:
+  vocabSize: 272
+  contextLength: 16
+  dModel: 384
+  numLayers: 12
+  numHeads: 6
+  ffnDim: 1024
+  ropeTheta: 10000.0
+  dropout: 0.0
+  tieEmbeddings: true
+training:
+  batchSize: 1
+  gradientAccumulationSteps: 1
+  learningRate: 0.001
+  minLearningRate: 0.0001
+  warmupSteps: 1
+  weightDecay: 0.0
+  beta1: 0.9
+  beta2: 0.95
+  gradientClipNorm: 1.0
+  seed: 42
