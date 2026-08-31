@@ -9,6 +9,7 @@ import io.github.lxptechnologies.lxpmini.config.ConfigLoader
 import io.github.lxptechnologies.lxpmini.generation.AutoregressiveGenerator
 import io.github.lxptechnologies.lxpmini.generation.GenerationResult
 import io.github.lxptechnologies.lxpmini.generation.GenerationStep
+import io.github.lxptechnologies.lxpmini.generation.GenerationTokenConstraint
 import io.github.lxptechnologies.lxpmini.generation.SamplingOptions
 import io.github.lxptechnologies.lxpmini.generation.TokenSampler
 import io.github.lxptechnologies.lxpmini.model.DecoderLanguageModel
@@ -151,6 +152,11 @@ class InferenceRuntime internal constructor(
     private val lifecycleLock = ReentrantLock(true)
     private val closed = AtomicBoolean(false)
     private val completedRequests = AtomicLong(0)
+    private val utf8TokenConstraint = Utf8TokenConstraint(
+        tokenizer = tokenizer,
+        vocabularySize = metadata.vocabularySize,
+        eosTokenId = SpecialToken.EOS.id,
+    )
 
     val isClosed: Boolean
         get() = closed.get()
@@ -172,6 +178,7 @@ class InferenceRuntime internal constructor(
     private fun generateInternal(
         request: TokenGenerationRequest,
         onStep: (GenerationStep) -> Unit = {},
+        tokenConstraint: GenerationTokenConstraint? = null,
     ): InferenceGenerationResult = lifecycleLock.withLock {
         requireOpen()
         validateContextBudget(request)
@@ -183,7 +190,8 @@ class InferenceRuntime internal constructor(
                     metadata.contextLength,
                     metadata.vocabularySize,
                     TokenSampler(request.seed),
-                    session::lastTokenLogits,
+                    tokenConstraint = tokenConstraint,
+                    logitsProvider = session::lastTokenLogits,
                 )
                 val result = generator.generate(
                     request.promptTokenIds,
@@ -206,7 +214,11 @@ class InferenceRuntime internal constructor(
 
     fun complete(request: CompletionRequest): CompletionResult {
         val promptTokenIds = encodePrompt(request)
-        val detailedGeneration = generateWithMetrics(request.toTokenGenerationRequest(promptTokenIds))
+        val generationRequest = request.toTokenGenerationRequest(promptTokenIds)
+        val detailedGeneration = generateInternal(
+            generationRequest,
+            tokenConstraint = utf8TokenConstraint,
+        )
         return completionResult(request, detailedGeneration.generation, detailedGeneration.metrics)
     }
 
@@ -221,9 +233,12 @@ class InferenceRuntime internal constructor(
     ): CompletionResult {
         val promptTokenIds = encodePrompt(request)
         val textDecoder = IncrementalTextDecoder(tokenizer)
-        val detailedGeneration = generateStreaming(request.toTokenGenerationRequest(promptTokenIds)) { step ->
-            textDecoder.accept(step.sampling.tokenId, onTextDelta)
-        }
+        val generationRequest = request.toTokenGenerationRequest(promptTokenIds)
+        val detailedGeneration = generateInternal(
+            request = generationRequest,
+            onStep = { step -> textDecoder.accept(step.sampling.tokenId, onTextDelta) },
+            tokenConstraint = utf8TokenConstraint,
+        )
         val generation = detailedGeneration.generation
         textDecoder.finish(onTextDelta)
         return completionResult(request, generation, detailedGeneration.metrics)

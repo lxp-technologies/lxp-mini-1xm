@@ -20,6 +20,8 @@ Ouvre `http://localhost:8080/` pour le playground. Dans un second PowerShell, un
 de vrais deltas SSE. Consulte le [chapitre PR16](docs/16-openai-compatible-completions.md) et la
 [note de laboratoire](docs/lab-notes/pr-16-openai-completions.md) pour les commandes complètes. Pour interdire SSE,
 démarre plutôt le serveur avec `--no-streaming-enabled`; les completions non-streamées restent disponibles.
+Les completions texte masquent les byte tokens qui rendraient la sortie UTF-8 invalide; le tiny modèle peut néanmoins
+produire du texte incohérent tant qu'il n'est pas suffisamment entraîné.
 
 Inspecte les devices avec `.\gradlew.bat run --args="runtime info --device auto"`. Sur Windows NVIDIA,
 `-PpytorchNative=cuda` verrouille PyTorch 2.7.1/cu128 et `--device cuda:0` exige le GPU sans fallback.

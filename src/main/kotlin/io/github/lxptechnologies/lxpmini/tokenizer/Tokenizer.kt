@@ -14,6 +14,11 @@ interface Tokenizer {
         skipSpecialTokens: Boolean = true,
     ): String
 
+    fun decodeToBytes(
+        tokenIds: IntArray,
+        skipSpecialTokens: Boolean = true,
+    ): ByteArray
+
     fun decodeLossy(
         tokenIds: IntArray,
         skipSpecialTokens: Boolean = true,

@@ -105,12 +105,24 @@ Un tokenizer byte-level sait représenter les 256 valeurs possibles, mais une su
 nécessairement du texte UTF-8 valide. C'est fréquent avec le tiny checkpoint de démonstration, encore insuffisamment
 entraîné pour toujours produire des séquences linguistiques valides.
 
-Le décodage reste strict dans le pipeline tokenizer afin de détecter les datasets et artefacts incorrects. Seule la
-frontière d'affichage de l'inférence utilise un décodage tolérant : chaque séquence invalide est remplacée par `�`
-(`U+FFFD`) plutôt que de transformer une completion valide au niveau des IDs en erreur HTTP 500. En SSE, un préfixe
-incomplet est d'abord mis en attente; s'il devient valide avec le token suivant, le caractère réel est diffusé. Le
-reliquat réellement invalide est remplacé et envoyé avant le chunk final, ce qui garantit que le texte streamé est
-identique au texte non streamé.
+Les completions texte appliquent donc une contrainte UTF-8 avant le sampling. À chaque étape, un automate masque les
+tokens qui créeraient une séquence invalide; top-k et top-p sont ensuite calculés uniquement sur les candidats permis.
+Il refuse aussi de commencer un caractère multibyte si le budget restant ne permet pas de le terminer. Cette approche
+préserve greedy, température et seed, tout en garantissant une sortie décodable sans caractère de remplacement.
+
+```mermaid
+flowchart LR
+    LOGITS[Logits du modèle] --> DFA[Masque automate UTF-8]
+    DFA --> SAMPLE[Greedy ou sampling]
+    SAMPLE --> BYTES[Bytes valides ou préfixe complétable]
+    BYTES -->|token suivant| DFA
+    BYTES --> TEXT[Texte UTF-8 final]
+```
+
+Le décodage strict demeure dans le pipeline tokenizer pour détecter les datasets et artefacts incorrects.
+`decodeLossy()` reste un filet de sécurité à la frontière d'affichage, mais une completion contrainte ne doit pas
+l'utiliser. En SSE, un caractère multibyte incomplet est mis en attente jusqu'à son dernier byte; le texte streamé
+reste ainsi identique au texte non streamé. Les APIs de génération d'IDs demeurent volontairement non contraintes.
 
 ## Pourquoi Spring sans plugin Boot
 

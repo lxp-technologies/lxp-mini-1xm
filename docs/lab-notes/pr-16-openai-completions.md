@@ -158,15 +158,16 @@ encore un chatbot.
 
 ## Expérience D - Reproduire une sortie UTF-8 invalide
 
-Le tiny modèle peut choisir des byte tokens qui ne forment pas du UTF-8 valide. Avant le correctif PR16, le playground
-retournait alors une erreur 500 contenant `Generated token IDs do not form valid text`. Ce test reprend la séquence
-observée et vérifie le décodage non-streaming ainsi que le flush final du streaming :
+Le tiny modèle peut favoriser des byte tokens qui ne forment pas du UTF-8 valide. Avant le correctif PR16, le
+playground retournait une erreur 500; le premier correctif remplaçait ces bytes par `�`. La contrainte finale les
+retire maintenant de la distribution avant le sampling. Ces tests couvrent la séquence observée, l'automate UTF-8,
+le masque du sampler et l'équivalence streaming :
 
 ```powershell
-.\gradlew.bat test --tests "io.github.lxptechnologies.lxpmini.tokenizer.ByteTokenizerTest" --tests "io.github.lxptechnologies.lxpmini.inference.IncrementalTextDecoderTest"
+.\gradlew.bat test --tests "io.github.lxptechnologies.lxpmini.tokenizer.ByteTokenizerTest" --tests "io.github.lxptechnologies.lxpmini.inference.Utf8TokenConstraintTest" --tests "io.github.lxptechnologies.lxpmini.inference.IncrementalTextDecoderTest" --tests "io.github.lxptechnologies.lxpmini.generation.TokenSamplerTest"
 ```
 
-Résultat attendu : `BUILD SUCCESSFUL`. `decode()` continue de rejeter une séquence invalide, tandis que
-`decodeLossy()` la rend affichable avec `�`. Pour vérifier manuellement dans le playground, arrêter l'ancien serveur
-avec `Ctrl+C`, relancer la même commande `serve`, puis générer avec le même prompt et la même seed. La réponse peut
-contenir `�`, ce qui décrit fidèlement les bytes encore mal appris, mais elle ne doit plus produire une erreur 500.
+Résultat attendu : `BUILD SUCCESSFUL`. Pour vérifier manuellement dans le playground, arrêter l'ancien serveur avec
+`Ctrl+C`, relancer la même commande `serve`, puis générer avec le même prompt et la même seed. La réponse ne doit
+contenir ni erreur 500 ni `�`. Elle peut rester incohérente ou contenir des caractères Unicode inattendus : la
+contrainte garantit l'encodage, tandis que la qualité linguistique dépend de l'entraînement du modèle.

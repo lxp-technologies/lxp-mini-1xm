@@ -6,14 +6,19 @@ import kotlin.math.exp
 class TokenSampler(seed: Long) {
     private val random = Random(seed)
 
-    fun select(logits: FloatArray, options: SamplingOptions): SamplingResult {
-        validate(logits, options)
+    fun select(
+        logits: FloatArray,
+        options: SamplingOptions,
+        allowedTokenIds: BooleanArray? = null,
+    ): SamplingResult {
+        validate(logits, options, allowedTokenIds)
+        val selectableTokenIds = logits.indices.filter { tokenId -> allowedTokenIds?.get(tokenId) != false }
         if (options.strategy == SamplingStrategy.GREEDY) {
-            val tokenId = logits.indices.maxBy { index -> logits[index] }
+            val tokenId = selectableTokenIds.maxBy { index -> logits[index] }
             return SamplingResult(tokenId, 1.0, listOf(TokenProbability(tokenId, 1.0, logits[tokenId].toDouble())))
         }
 
-        val sorted = logits.indices
+        val sorted = selectableTokenIds
             .map { tokenId -> ScaledLogit(tokenId, logits[tokenId].toDouble() / options.temperature) }
             .sortedWith(compareByDescending<ScaledLogit>(ScaledLogit::value).thenBy(ScaledLogit::tokenId))
         val topKCandidates = if (options.topK == 0) sorted else sorted.take(options.topK)
@@ -53,9 +58,15 @@ class TokenSampler(seed: Long) {
         return SamplingResult(sampled.tokenId, sampled.probability, normalized)
     }
 
-    private fun validate(logits: FloatArray, options: SamplingOptions) {
+    private fun validate(logits: FloatArray, options: SamplingOptions, allowedTokenIds: BooleanArray?) {
         if (logits.isEmpty()) throw GenerationException("Logits cannot be empty")
         if (logits.any { value -> !value.isFinite() }) throw GenerationException("All logits must be finite")
+        if (allowedTokenIds != null && allowedTokenIds.size != logits.size) {
+            throw GenerationException("Allowed token mask size must match logits size")
+        }
+        if (allowedTokenIds != null && allowedTokenIds.none { it }) {
+            throw GenerationException("Allowed token mask must contain at least one token")
+        }
         if (!options.temperature.isFinite() || options.temperature <= 0.0) {
             throw GenerationException("temperature must be finite and positive")
         }

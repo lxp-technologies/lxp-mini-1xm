@@ -74,6 +74,22 @@ class TokenSamplerTest {
     }
 
     @Test
+    fun `selection considers only tokens allowed by the constraint`() {
+        val allowed = booleanArrayOf(true, false, true, false)
+        val logits = floatArrayOf(1f, 100f, 2f, 200f)
+
+        val greedy = TokenSampler(1).select(
+            logits,
+            SamplingOptions(strategy = SamplingStrategy.GREEDY),
+            allowed,
+        )
+        val sampled = TokenSampler(1).select(logits, SamplingOptions(), allowed)
+
+        assertThat(greedy.tokenId).isEqualTo(2)
+        assertThat(sampled.candidates.map(TokenProbability::tokenId)).containsOnly(0, 2)
+    }
+
+    @Test
     fun `rejects invalid sampling controls and non-finite logits`() {
         assertThatThrownBy { TokenSampler(1).select(floatArrayOf(Float.NaN), SamplingOptions()) }
             .isInstanceOf(GenerationException::class.java)
@@ -83,5 +99,8 @@ class TokenSamplerTest {
             .isInstanceOf(GenerationException::class.java)
         assertThatThrownBy { TokenSampler(1).select(floatArrayOf(1f), SamplingOptions(topP = 0.0)) }
             .isInstanceOf(GenerationException::class.java)
+        assertThatThrownBy {
+            TokenSampler(1).select(floatArrayOf(1f), SamplingOptions(), booleanArrayOf(false))
+        }.isInstanceOf(GenerationException::class.java)
     }
 }

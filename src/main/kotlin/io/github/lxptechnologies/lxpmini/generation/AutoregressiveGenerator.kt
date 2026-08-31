@@ -4,6 +4,7 @@ class AutoregressiveGenerator(
     private val contextLength: Int,
     private val vocabularySize: Int,
     private val sampler: TokenSampler,
+    private val tokenConstraint: GenerationTokenConstraint? = null,
     private val logitsProvider: (IntArray) -> FloatArray,
 ) {
     init {
@@ -34,7 +35,9 @@ class AutoregressiveGenerator(
             if (logits.size != vocabularySize) {
                 throw GenerationException("Logits size ${logits.size} does not match vocabularySize $vocabularySize")
             }
-            val sampling = sampler.select(logits, options)
+            val remainingSteps = maxNewTokens - stepIndex - 1
+            val allowedTokenIds = tokenConstraint?.allowedTokenIds(generated.toIntArray(), remainingSteps)
+            val sampling = sampler.select(logits, options, allowedTokenIds)
             allTokens += sampling.tokenId
             generated += sampling.tokenId
             val step = GenerationStep(stepIndex + 1, context, sampling)
@@ -54,6 +57,10 @@ class AutoregressiveGenerator(
             throw GenerationException("Token ID $invalid is outside vocabulary 0..${vocabularySize - 1}")
         }
     }
+}
+
+fun interface GenerationTokenConstraint {
+    fun allowedTokenIds(generatedTokenIds: IntArray, remainingSteps: Int): BooleanArray
 }
 
 data class GenerationStep(
