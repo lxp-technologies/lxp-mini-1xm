@@ -79,6 +79,7 @@ class LanguageModelTrainerTest {
                 val trainer = LanguageModelTrainer(model, manager, tinyTrainingConfig(), updates)
                 var initialLoss = Float.NaN
                 var finalLoss = Float.NaN
+                var stableResourceCount = -1
 
                 repeat(updates) {
                     manager.newSubManager().use { batchManager ->
@@ -87,6 +88,11 @@ class LanguageModelTrainerTest {
                         val metrics = trainer.trainMicroBatch(input, targets)
                         if (it == 0) initialLoss = metrics.loss
                         finalLoss = metrics.loss
+                    }
+                    if (it == 0) {
+                        stableResourceCount = manager.managedArrays.size
+                    } else {
+                        assertThat(manager.managedArrays.size).isEqualTo(stableResourceCount)
                     }
                 }
 

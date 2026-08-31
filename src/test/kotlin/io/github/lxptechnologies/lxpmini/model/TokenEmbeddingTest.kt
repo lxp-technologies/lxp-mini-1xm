@@ -13,6 +13,36 @@ import org.junit.jupiter.api.Test
 
 class TokenEmbeddingTest {
     @Test
+    fun `embedding output belongs to the batch manager while weights stay with the model`() {
+        NDManager.newBaseManager(Device.cpu()).use { rootManager ->
+            rootManager.newSubManager().use { modelManager ->
+                val embedding = TokenEmbedding(vocabularySize = 4, embeddingSize = 3)
+                embedding.initialize(modelManager, DataType.FLOAT32, Shape(1, 2))
+                val weight = embedding.weightParameter.array
+                modelManager.cap()
+
+                val output = rootManager.newSubManager().use { batchManager ->
+                    val tokenIds = batchManager.create(longArrayOf(1, 2), Shape(1, 2))
+                    val value = embedding.forward(
+                        ParameterStore(modelManager, false),
+                        NDList(tokenIds),
+                        false,
+                    ).singletonOrThrow()
+
+                    assertThat(weight.manager).isSameAs(modelManager)
+                    assertThat(tokenIds.manager).isSameAs(batchManager)
+                    assertThat(value.manager).isSameAs(batchManager)
+                    value
+                }
+
+                assertThat(output.isReleased).isTrue()
+                assertThat(weight.isReleased).isFalse()
+                embedding.clear()
+            }
+        }
+    }
+
+    @Test
     fun `maps each token ID to its learned row and preserves B T dimensions`() {
         NDManager.newBaseManager(Device.cpu()).use { manager ->
             val embedding = TokenEmbedding(vocabularySize = 4, embeddingSize = 3)

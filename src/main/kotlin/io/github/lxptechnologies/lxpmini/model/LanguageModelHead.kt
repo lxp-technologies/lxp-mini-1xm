@@ -2,6 +2,7 @@ package io.github.lxptechnologies.lxpmini.model
 
 import ai.djl.ndarray.NDArray
 import ai.djl.ndarray.NDList
+import ai.djl.ndarray.index.NDIndex
 import ai.djl.ndarray.types.Shape
 import ai.djl.nn.AbstractBlock
 import ai.djl.nn.Parameter
@@ -41,7 +42,11 @@ class LanguageModelHead(
         val input = inputs.singletonOrThrow()
         requireInputShape(input.shape)
         val weight = parameterStore.getValue(weightParameter, input.device, training)
-        val projectionWeight = if (tieEmbeddings) weight.transpose() else weight
+        val projectionWeight = if (tieEmbeddings) {
+            weight.get(input.manager, NDIndex(":, :")).transpose()
+        } else {
+            weight
+        }
         return NDList(input.matMul(projectionWeight))
     }
 

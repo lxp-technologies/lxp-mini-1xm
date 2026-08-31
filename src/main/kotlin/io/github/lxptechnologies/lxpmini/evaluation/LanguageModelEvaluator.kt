@@ -14,6 +14,7 @@ class LanguageModelEvaluator(
     private val manager: NDManager,
     private val lossFunction: NextTokenCrossEntropy = NextTokenCrossEntropy(),
     private val nanoTime: () -> Long = System::nanoTime,
+    private val resourceObserver: ((EvaluationResourceSnapshot) -> Unit)? = null,
 ) {
     private val parameterStore = ParameterStore(manager, false)
 
@@ -27,9 +28,11 @@ class LanguageModelEvaluator(
         var weightedLoss = 0.0
         var tokenCount = 0L
         var batchCount = 0
+        observeResources(batchCount)
 
         for (batch in batches.take(maxBatches)) {
             manager.newSubManager().use { temporary ->
+                temporary.name = "evaluation-batch-${batchCount + 1}"
                 val shape = Shape(batch.batchSize.toLong(), batch.sequenceLength.toLong())
                 val inputs = temporary.create(batch.inputIds.toLongArray(), shape)
                 val targets = temporary.create(batch.targetIds.toLongArray(), shape)
@@ -41,6 +44,7 @@ class LanguageModelEvaluator(
                 tokenCount += batchTokens
                 batchCount += 1
             }
+            observeResources(batchCount)
         }
         if (batchCount == 0) throw EvaluationException("Evaluation dataset contains no complete batch")
 
@@ -56,6 +60,10 @@ class LanguageModelEvaluator(
         )
     }
 
+    private fun observeResources(completedBatches: Int) {
+        resourceObserver?.invoke(EvaluationResourceSnapshot(completedBatches, manager.managedArrays.size))
+    }
+
     companion object {
         private const val NANOS_PER_SECOND = 1_000_000_000.0
 
@@ -65,6 +73,11 @@ class LanguageModelEvaluator(
         }
     }
 }
+
+data class EvaluationResourceSnapshot(
+    val completedBatches: Int,
+    val managedArrayCount: Int,
+)
 
 data class EvaluationMetrics(
     val loss: Double,

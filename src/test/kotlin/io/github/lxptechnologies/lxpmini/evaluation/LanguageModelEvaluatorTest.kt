@@ -56,6 +56,52 @@ class LanguageModelEvaluatorTest {
         }
     }
 
+    @Test
+    fun `repeated evaluation releases every batch without growing model resources`() {
+        NDManager.newBaseManager(Device.cpu()).use { rootManager ->
+            rootManager.newSubManager().use { modelManager ->
+                DecoderLanguageModel(modelManager, tinyConfig()).use { model ->
+                    model.initialize(modelManager, DataType.FLOAT32, Shape(1, 3))
+                    val parameterCount = model.actualParameterCount()
+                    val gradients = model.parameters.values().associate { parameter ->
+                        parameter.id to parameter.array.gradient
+                    }
+                    val gradientsBefore = gradients.mapValues { (_, gradient) -> gradient.toFloatArray() }
+                    val modelResources = modelManager.managedArrays.size
+                    modelManager.cap()
+                    val resourceSnapshots = mutableListOf<EvaluationResourceSnapshot>()
+                    val evaluator = LanguageModelEvaluator(
+                        model,
+                        rootManager,
+                        resourceObserver = resourceSnapshots::add,
+                    )
+                    val batch = TokenBatch(
+                        1,
+                        3,
+                        intArrayOf(3, 4, 5),
+                        intArrayOf(4, 5, 6),
+                    )
+
+                    val result = evaluator.evaluate(generateSequence { batch }.take(REPEATED_BATCHES))
+
+                    assertThat(result.batchCount).isEqualTo(REPEATED_BATCHES)
+                    assertThat(result.loss).isFinite().isPositive()
+                    assertThat(model.actualParameterCount()).isEqualTo(parameterCount)
+                    assertThat(modelManager.managedArrays.size).isEqualTo(modelResources)
+                    assertThat(resourceSnapshots).hasSize(REPEATED_BATCHES + 1)
+                    assertThat(resourceSnapshots.map(EvaluationResourceSnapshot::completedBatches))
+                        .containsExactlyElementsOf(0..REPEATED_BATCHES)
+                    assertThat(resourceSnapshots.map(EvaluationResourceSnapshot::managedArrayCount).distinct())
+                        .hasSize(1)
+                    model.parameters.values().forEach { parameter ->
+                        assertThat(gradients.getValue(parameter.id).toFloatArray())
+                            .containsExactly(*gradientsBefore.getValue(parameter.id))
+                    }
+                }
+            }
+        }
+    }
+
     private fun tinyConfig() = ModelConfig(
         vocabSize = 16,
         contextLength = 3,
@@ -67,4 +113,8 @@ class LanguageModelEvaluatorTest {
         dropout = 0.0,
         tieEmbeddings = true,
     )
+
+    private companion object {
+        const val REPEATED_BATCHES = 128
+    }
 }
