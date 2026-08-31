@@ -31,24 +31,24 @@ Pour autoriser `stream:true` :
 
 Les deux interrupteurs ont des responsabilités différentes :
 
-| Niveau | Valeur | Effet |
-|---|---|---|
-| serveur | `--no-streaming-enabled` | refuse toute requête `stream:true`; valeur par défaut |
-| serveur | `--streaming-enabled` | autorise les réponses SSE |
-| requête | `"stream": false` | produit un unique objet JSON, même si le serveur autorise SSE |
-| requête | `"stream": true` | produit des événements SSE seulement si le serveur l'autorise |
+| Niveau  | Valeur                   | Effet                                                         |
+|---------|--------------------------|---------------------------------------------------------------|
+| serveur | `--no-streaming-enabled` | refuse toute requête `stream:true`; valeur par défaut         |
+| serveur | `--streaming-enabled`    | autorise les réponses SSE                                     |
+| requête | `"stream": false`        | produit un unique objet JSON, même si le serveur autorise SSE |
+| requête | `"stream": true`         | produit des événements SSE seulement si le serveur l'autorise |
 
 Un host non loopback exige `--allow-remote`. Cette protection est volontaire : PR16 n'implémente aucune
 authentification ni TLS.
 
 ## Contrat exposé
 
-| Endpoint | Support |
-|---|---|
-| `GET /health` | état, modèle, checkpoint et capacité streaming |
-| `GET /v1/models` | liste contenant l'unique runtime chargé |
+| Endpoint                 | Support                                           |
+|--------------------------|---------------------------------------------------|
+| `GET /health`            | état, modèle, checkpoint et capacité streaming    |
+| `GET /v1/models`         | liste contenant l'unique runtime chargé           |
 | `GET /v1/models/{model}` | métadonnées du modèle ou erreur `model_not_found` |
-| `POST /v1/completions` | completion texte legacy, JSON ou SSE |
+| `POST /v1/completions`   | completion texte legacy, JSON ou SSE              |
 
 PR16 suit la forme de la ressource legacy Completions et de la ressource Models documentées par OpenAI, sans prétendre
 supporter toute leur surface ([Completions](https://developers.openai.com/api/reference/resources/completions),
@@ -56,19 +56,19 @@ supporter toute leur surface ([Completions](https://developers.openai.com/api/re
 
 ### Matrice des champs
 
-| Champ | Support PR16 | Traduction réelle |
-|---|---|---|
-| `model` | requis | doit être l'identifiant du runtime chargé |
-| `prompt` | chaîne requise | encodé par le tokenizer du checkpoint |
-| `max_tokens` | oui, défaut `16` | `maxNewTokens`; budget total borné par le contexte |
-| `temperature` | oui, `[0,2]` | `0` active greedy, sinon sampling |
-| `top_p` | oui, `(0,1]` | nucleus sampling |
-| `seed` | oui | seed du sampler local |
-| `stream` | oui | JSON ou vrais deltas SSE selon la capacité serveur |
-| `n` / `best_of` | seulement `1` | une seule génération |
-| `echo` | seulement `false` | le texte retourné est uniquement la continuation |
-| `stop`, `logprobs`, pénalités, `logit_bias`, `suffix`, `user`, `stream_options` | non | erreur `unsupported_feature` |
-| champ inconnu | non | erreur `unknown_parameter`; jamais ignoré |
+| Champ                                                                           | Support PR16      | Traduction réelle                                  |
+|---------------------------------------------------------------------------------|-------------------|----------------------------------------------------|
+| `model`                                                                         | requis            | doit être l'identifiant du runtime chargé          |
+| `prompt`                                                                        | chaîne requise    | encodé par le tokenizer du checkpoint              |
+| `max_tokens`                                                                    | oui, défaut `16`  | `maxNewTokens`; budget total borné par le contexte |
+| `temperature`                                                                   | oui, `[0,2]`      | `0` active greedy, sinon sampling                  |
+| `top_p`                                                                         | oui, `(0,1]`      | nucleus sampling                                   |
+| `seed`                                                                          | oui               | seed du sampler local                              |
+| `stream`                                                                        | oui               | JSON ou vrais deltas SSE selon la capacité serveur |
+| `n` / `best_of`                                                                 | seulement `1`     | une seule génération                               |
+| `echo`                                                                          | seulement `false` | le texte retourné est uniquement la continuation   |
+| `stop`, `logprobs`, pénalités, `logit_bias`, `suffix`, `user`, `stream_options` | non               | erreur `unsupported_feature`                       |
+| champ inconnu                                                                   | non               | erreur `unknown_parameter`; jamais ignoré          |
 
 Les erreurs utilisent `{ "error": { "message", "type", "param", "code" } }`. Le serveur refuse le budget avant
 le forward avec `prompt_tokens + max_tokens <= contextLength`; l'API n'emploie pas la fenêtre glissante implicitement.
