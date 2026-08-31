@@ -43,6 +43,9 @@ Ce dossier accompagne le code dans l'ordre où les concepts sont construits. Ne 
 37. [Runtime d'inférence réutilisable](14-inference-runtime.md)
 38. [ADR : runtime chargé une fois et sérialisé](architecture/decisions/0009-single-loaded-serialized-inference-runtime.md)
 39. [PR14 : comparer 100 chargements à un runtime](lab-notes/pr-14-inference-runtime.md)
-40. [Plan complet des PR](plan-directeur.md)
+40. [Cache KV et gestion du contexte](15-kv-cache-and-context.md)
+41. [ADR : cache KV isolé par requête](architecture/decisions/0010-request-scoped-kv-cache.md)
+42. [PR15 : mesurer 32, 64 et 128 tokens](lab-notes/pr-15-kv-cache-and-context.md)
+43. [Plan complet des PR](plan-directeur.md)
 
 Les prochains chapitres seront ajoutés avec leur implémentation. Un document ne prétendra jamais qu'un composant fonctionne avant que sa PR fournisse les tests correspondants.

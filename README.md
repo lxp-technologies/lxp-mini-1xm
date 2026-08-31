@@ -2,6 +2,21 @@
 
 Petit modèle de langage decoder-only construit progressivement from scratch en Kotlin/JVM. Chaque PR introduit un concept exécutable, testé et documenté.
 
+## PR15 - Accélérer le décodage avec un cache KV
+
+Prépare un tiny model à contexte 256, puis compare cache et recalcul sur 32, 64 et 128 tokens :
+
+```powershell
+$labId = Get-Date -Format yyyyMMdd-HHmmss
+$runDir = "build/labs/pr15/demo-$labId"
+$tokenizerPath = "build/labs/pr15/tokenizer-$labId.json"
+.\gradlew.bat run --args="tokenizer byte create --output $tokenizerPath"
+.\gradlew.bat run --args="train checkpoint-demo --config configs/lab-pr15-kv-cache.yaml --run-dir $runDir --before-updates 80 --after-updates 1"
+.\gradlew.bat run --args="inference cache-benchmark --model-id lxp-mini-pr15-tiny-base --run-dir $runDir --tokenizer $tokenizerPath --prompt abc --new-token-counts 32,64,128 --iterations 3"
+```
+
+Le cache est isolé et fermé par requête. `--no-kv-cache` force le recalcul complet; `--context-policy reject` refuse un budget trop grand, tandis que `sliding-window` invalide et reconstruit le cache lorsque la fenêtre glisse. Consulte le [chapitre PR15](docs/15-kv-cache-and-context.md) et la [note de laboratoire](docs/lab-notes/pr-15-kv-cache-and-context.md).
+
 ## PR14 - Réutiliser un runtime d'inférence
 
 Prépare un checkpoint tiny et son tokenizer, puis envoie plusieurs requêtes au même modèle chargé :

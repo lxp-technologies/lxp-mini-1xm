@@ -91,6 +91,71 @@ class InferenceRuntimeTest {
             .hasMessageContaining("modelId must match")
     }
 
+    @Test
+    fun `runtime reports cache savings invalidates sliding windows and rejects overflow`() {
+        val artifacts = createArtifacts()
+        InferenceRuntimeLoader().load(MODEL_ID, artifacts.runDirectory, artifacts.tokenizerPath).use { runtime ->
+            val baseRequest = TokenGenerationRequest(
+                promptTokenIds = ByteTokenizer().encode("abc"),
+                maxNewTokens = 3,
+                sampling = SamplingOptions(strategy = SamplingStrategy.GREEDY),
+                eosTokenId = 258,
+                contextPolicy = ContextOverflowPolicy.REJECT,
+            )
+            val cached = runtime.generateWithMetrics(baseRequest)
+            val recomputed = runtime.generateWithMetrics(baseRequest.copy(cacheEnabled = false))
+
+            assertThat(cached.generation.generatedTokenIds)
+                .containsExactly(*recomputed.generation.generatedTokenIds)
+            assertThat(cached.metrics.prefillTokensProcessed).isEqualTo(3)
+            assertThat(cached.metrics.decodeTokensProcessed).isEqualTo(2)
+            assertThat(cached.metrics.modelTokensProcessed).isEqualTo(5)
+            assertThat(cached.metrics.peakCachedTokens).isEqualTo(5)
+            assertThat(recomputed.metrics.prefillTokensProcessed).isEqualTo(3)
+            assertThat(recomputed.metrics.decodeTokensProcessed).isEqualTo(9)
+            assertThat(recomputed.metrics.modelTokensProcessed).isEqualTo(12)
+
+            val slidingRequest = TokenGenerationRequest(
+                promptTokenIds = ByteTokenizer().encode("abcdefg"),
+                maxNewTokens = 3,
+                sampling = SamplingOptions(strategy = SamplingStrategy.GREEDY),
+                eosTokenId = 258,
+                contextPolicy = ContextOverflowPolicy.SLIDING_WINDOW,
+            )
+            val sliding = runtime.generateWithMetrics(slidingRequest)
+            val slidingRecomputed = runtime.generateWithMetrics(slidingRequest.copy(cacheEnabled = false))
+            assertThat(sliding.generation.generatedTokenIds)
+                .containsExactly(*slidingRecomputed.generation.generatedTokenIds)
+            assertThat(sliding.metrics.cacheInvalidations).isEqualTo(1)
+            assertThat(sliding.metrics.prefillTokensProcessed).isEqualTo(15)
+            assertThat(sliding.metrics.decodeTokensProcessed).isEqualTo(1)
+            assertThat(sliding.metrics.peakCachedTokens).isEqualTo(8)
+
+            val truncatedPrompt = runtime.generateWithMetrics(
+                TokenGenerationRequest(
+                    promptTokenIds = ByteTokenizer().encode("abcdefghij"),
+                    maxNewTokens = 1,
+                    sampling = SamplingOptions(strategy = SamplingStrategy.GREEDY),
+                    eosTokenId = 258,
+                    contextPolicy = ContextOverflowPolicy.SLIDING_WINDOW,
+                ),
+            )
+            assertThat(truncatedPrompt.metrics.promptTokensDiscarded).isEqualTo(2)
+            assertThat(truncatedPrompt.metrics.prefillTokensProcessed).isEqualTo(8)
+
+            assertThatThrownBy {
+                runtime.generate(
+                    baseRequest.copy(
+                        promptTokenIds = ByteTokenizer().encode("abcdefg"),
+                        maxNewTokens = 2,
+                    ),
+                )
+            }.isInstanceOf(InferenceException::class.java)
+                .hasMessageContaining("exceeds context 8")
+            assertThat(runtime.diagnostics().completedRequests).isEqualTo(5)
+        }
+    }
+
     private fun createArtifacts(): InferenceArtifacts {
         val runDirectory = temporaryDirectory.resolve("run-${System.nanoTime()}")
         val tokenizerPath = temporaryDirectory.resolve("tokenizer-${System.nanoTime()}.json")

@@ -58,6 +58,31 @@ class CausalSelfAttention(
         return CausalAttentionResult(output, probabilities)
     }
 
+    internal fun forwardIncremental(
+        parameterStore: ParameterStore,
+        input: NDArray,
+        cache: AttentionKeyValueCache,
+    ): CausalAttentionResult {
+        requireInputShape(input.shape)
+        val pastTokenCount = cache.tokenCount
+        if (pastTokenCount + input.shape[1] > maximumSequenceLength) {
+            throw TensorShapeException(
+                "Incremental attention length ${pastTokenCount + input.shape[1]} exceeds context $maximumSequenceLength",
+            )
+        }
+        val query = rope.apply(splitHeads(project(input, queryWeight, parameterStore, false)), pastTokenCount)
+        val newKeys = rope.apply(splitHeads(project(input, keyWeight, parameterStore, false)), pastTokenCount)
+        val newValues = splitHeads(project(input, valueWeight, parameterStore, false))
+        val cached = cache.append(newKeys, newValues)
+        val scores = query.matMul(cached.keys.transpose(0, 1, 3, 2)).div(sqrt(headDimension.toDouble()))
+        val probabilities = scores
+            .add(incrementalCausalMask(input, pastTokenCount, cached.keys.shape[2].toInt()))
+            .softmax(-1)
+        val context = probabilities.matMul(cached.values)
+        val output = project(mergeHeads(context), outputWeight, parameterStore, false)
+        return CausalAttentionResult(output, probabilities)
+    }
+
     override fun getOutputShapes(inputShapes: Array<Shape>): Array<Shape> {
         if (inputShapes.size != 1) throw TensorShapeException("CausalSelfAttention expects exactly one input shape")
         requireInputShape(inputShapes[0])
@@ -119,6 +144,20 @@ class CausalSelfAttention(
             }
         }
         return input.manager.create(values, Shape(sequenceLength, sequenceLength))
+    }
+
+    private fun incrementalCausalMask(input: NDArray, pastTokenCount: Int, totalTokenCount: Int): NDArray {
+        val queryTokenCount = input.shape[1].toInt()
+        val elementCount = queryTokenCount.toLong() * totalTokenCount
+        if (elementCount > Int.MAX_VALUE) throw TensorShapeException("Attention mask exceeds the JVM array limit")
+        val values = FloatArray(elementCount.toInt())
+        for (queryPosition in 0 until queryTokenCount) {
+            val maximumVisibleKey = pastTokenCount + queryPosition
+            for (keyPosition in maximumVisibleKey + 1 until totalTokenCount) {
+                values[queryPosition * totalTokenCount + keyPosition] = Float.NEGATIVE_INFINITY
+            }
+        }
+        return input.manager.create(values, Shape(queryTokenCount.toLong(), totalTokenCount.toLong()))
     }
 
     private fun requireInputShape(shape: Shape) {
