@@ -18,6 +18,7 @@ import java.util.concurrent.Callable
         DatasetCommand::class,
         TrainCommand::class,
         GenerateCommand::class,
+        InferenceCommand::class,
         EvaluateCommand::class,
         ExperimentCommand::class,
     ],

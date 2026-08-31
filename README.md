@@ -2,6 +2,29 @@
 
 Petit modèle de langage decoder-only construit progressivement from scratch en Kotlin/JVM. Chaque PR introduit un concept exécutable, testé et documenté.
 
+## PR14 - Réutiliser un runtime d'inférence
+
+Prépare un checkpoint tiny et son tokenizer, puis envoie plusieurs requêtes au même modèle chargé :
+
+```powershell
+$labId = Get-Date -Format yyyyMMdd-HHmmss
+$runDir = "build/labs/pr14/demo-$labId"
+$tokenizerPath = "build/labs/pr14/tokenizer-$labId.json"
+.\gradlew.bat run --args="tokenizer byte create --output $tokenizerPath"
+.\gradlew.bat run --args="train checkpoint-demo --config configs/lab-pr09-tiny.yaml --run-dir $runDir --before-updates 80 --after-updates 1"
+.\gradlew.bat run --args="inference complete --model-id lxp-mini-pr14-tiny-base --run-dir $runDir --tokenizer $tokenizerPath --prompt abc --requests 3 --max-new-tokens 12 --strategy greedy"
+```
+
+Conserve la même session PowerShell et compare ensuite 100 rechargements à un runtime réutilisé :
+
+```powershell
+.\gradlew.bat run --args="inference benchmark --model-id lxp-mini-pr14-tiny-base --run-dir $runDir --tokenizer $tokenizerPath --prompt abc --requests 100 --max-new-tokens 1"
+```
+
+`checkpoint-demo` refuse volontairement un `$runDir` existant ou non vide afin de ne jamais écraser un run reproductible.
+
+Le runtime expose `complete()` et `generate()`, sérialise explicitement les requêtes et ferme un scope DJL par requête. Consulte le [chapitre PR14](docs/14-inference-runtime.md) et la [note de laboratoire](docs/lab-notes/pr-14-inference-runtime.md).
+
 ## Correctif bloquant avant PR13 - Mémoire native DJL
 
 Le forward attache maintenant tous ses tenseurs temporaires au manager du batch, jamais au manager longue durée des paramètres. Pour reproduire le diagnostic 17,3 M avec 20 batches de validation :

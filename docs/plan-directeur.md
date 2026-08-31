@@ -1,6 +1,6 @@
 # Plan directeur de `lxp-mini-1xm`
 
-> Statut : PR01 à PR12 terminées; stabilisation de la mémoire native DJL en cours avant PR13; trajectoire post-PR13 planifiée jusqu'au chatbot, à l'alignement et aux expériences MoE
+> Statut : PR01 à PR14 terminées; runtime d'inférence réutilisable validé; PR15 cible le cache KV et la gestion du contexte
 > Source de vérité initiale : [`docs2/project.md`](../docs2/project.md)  
 > Dernière mise à jour : 2026-08-30
 
@@ -522,6 +522,8 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 
 #### PR14 - Inference Runtime
 
+**Statut :** implémentée le 2026-08-30 sur `feature/pr14-inference-runtime`. Le test compare le pipeline PR11, exécute 100 requêtes successives et vérifie la fermeture; le laboratoire mesure aussi 100 chargements contre une instance réutilisée.
+
 **Construire :** `InferenceRuntime` chargé une seule fois avec config, tokenizer et checkpoint; API Kotlin `complete()`/`generate()`; modèle `base` identifié par un ID stable; limites de concurrence explicites.
 
 **Tests :** chargement unique, logits/génération identiques à la CLI PR11, fermeture propre, requêtes successives sans croissance mémoire.
@@ -542,7 +544,7 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 
 #### PR16 - Serveur HTTP et OpenAI-compatible completions
 
-**Construire :** serveur Kotlin léger (Ktor à évaluer au début de la PR), binding `127.0.0.1` par défaut, `GET /health`, `GET /v1/models`, `GET /v1/models/{model}`, `POST /v1/completions`, erreurs JSON cohérentes et comptage `usage`.
+**Construire :** serveur Kotlin léger (Ktor à évaluer au début de la PR, mais réelle préférence pour Spring Boot), binding `127.0.0.1` par défaut, `GET /health`, `GET /v1/models`, `GET /v1/models/{model}`, `POST /v1/completions`, erreurs JSON cohérentes et comptage `usage`.
 
 **Compatibilité :** implémenter seulement les champs qui ont une traduction réelle vers le runtime (`model`, `prompt`, limite de génération, température, top-p, seed/stop lorsque supportés). Les champs inconnus ou non supportés ne doivent pas être silencieusement ignorés.
 
