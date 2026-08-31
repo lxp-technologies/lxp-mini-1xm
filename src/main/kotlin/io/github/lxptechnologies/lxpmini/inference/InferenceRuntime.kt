@@ -1,0 +1,292 @@
+package io.github.lxptechnologies.lxpmini.inference
+
+import ai.djl.Device
+import ai.djl.ndarray.NDList
+import ai.djl.ndarray.NDManager
+import ai.djl.ndarray.types.Shape
+import ai.djl.training.ParameterStore
+import io.github.lxptechnologies.lxpmini.checkpoint.CheckpointStore
+import io.github.lxptechnologies.lxpmini.checkpoint.RunStore
+import io.github.lxptechnologies.lxpmini.checkpoint.Sha256
+import io.github.lxptechnologies.lxpmini.config.ConfigLoader
+import io.github.lxptechnologies.lxpmini.generation.AutoregressiveGenerator
+import io.github.lxptechnologies.lxpmini.generation.GenerationResult
+import io.github.lxptechnologies.lxpmini.generation.SamplingOptions
+import io.github.lxptechnologies.lxpmini.generation.TokenSampler
+import io.github.lxptechnologies.lxpmini.model.DecoderLanguageModel
+import io.github.lxptechnologies.lxpmini.tokenizer.SpecialToken
+import io.github.lxptechnologies.lxpmini.tokenizer.Tokenizer
+import io.github.lxptechnologies.lxpmini.tokenizer.TokenizerArtifactLoader
+import io.github.lxptechnologies.lxpmini.tokenizer.TokenizerException
+import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
+
+class InferenceRuntimeLoader(
+    private val configLoader: ConfigLoader = ConfigLoader(),
+    private val checkpointStore: CheckpointStore = CheckpointStore(),
+    private val runStore: RunStore = RunStore(),
+    private val tokenizerLoader: TokenizerArtifactLoader = TokenizerArtifactLoader(),
+) {
+    fun load(modelId: String, runDirectory: Path, tokenizerPath: Path): InferenceRuntime {
+        requireModelId(modelId)
+        val rootManager = NDManager.newBaseManager(Device.cpu())
+        val modelManager = rootManager.newSubManager()
+        var model: DecoderLanguageModel? = null
+        try {
+            rootManager.name = "inference-runtime-$modelId"
+            modelManager.name = "inference-model-$modelId"
+            val configPath = runDirectory.resolve(RunStore.CONFIG_FILE)
+            val config = configLoader.load(configPath)
+            val runMetadata = runStore.loadMetadata(runDirectory)
+            val configSha256 = Sha256.of(configPath)
+            if (runMetadata.configSha256 != configSha256) {
+                throw InferenceException(
+                    "Run configuration checksum mismatch: expected ${runMetadata.configSha256}, got $configSha256",
+                )
+            }
+            val tokenizerArtifact = tokenizerLoader.load(tokenizerPath)
+            if (tokenizerArtifact.tokenizer.vocabularySize != config.model.vocabSize) {
+                throw InferenceException(
+                    "Tokenizer vocabulary ${tokenizerArtifact.tokenizer.vocabularySize} " +
+                        "does not match model vocabulary ${config.model.vocabSize}",
+                )
+            }
+            if (runMetadata.tokenizer != RunStore.DEFAULT_TOKENIZER && runMetadata.tokenizer != tokenizerArtifact.type) {
+                throw InferenceException(
+                    "Run expects tokenizer type '${runMetadata.tokenizer}', got '${tokenizerArtifact.type}'",
+                )
+            }
+            runMetadata.tokenizerSha256?.let { expected ->
+                val actual = Sha256.of(tokenizerPath)
+                if (actual != expected) {
+                    throw InferenceException("Tokenizer checksum mismatch: expected $expected, got $actual")
+                }
+            }
+
+            model = DecoderLanguageModel(modelManager, config.model)
+            val checkpoint = checkpointStore.loadLatest(runDirectory, model, modelManager, configSha256)
+            modelManager.cap()
+            return InferenceRuntime(
+                metadata = InferenceModelMetadata(
+                    modelId = modelId,
+                    kind = InferenceModelKind.BASE,
+                    checkpointId = checkpoint.manifest.checkpointId,
+                    checkpointSha256 = checkpoint.manifest.modelSha256,
+                    vocabularySize = config.model.vocabSize,
+                    contextLength = config.model.contextLength,
+                    parameterCount = model.actualParameterCount(),
+                    tokenizerType = tokenizerArtifact.type,
+                    concurrencyPolicy = InferenceConcurrencyPolicy.SERIALIZED,
+                ),
+                tokenizer = tokenizerArtifact.tokenizer,
+                rootManager = rootManager,
+                modelManager = modelManager,
+                model = model,
+            )
+        } catch (throwable: Throwable) {
+            closeAfterFailedLoad(throwable, model, modelManager, rootManager)
+            if (throwable is Error) throw throwable
+            if (throwable is InferenceException) throw throwable
+            throw InferenceException("Cannot load inference runtime '$modelId': ${throwable.message}", throwable)
+        }
+    }
+
+    private fun requireModelId(modelId: String) {
+        if (!modelId.matches(MODEL_ID_PATTERN)) {
+            throw InferenceException(
+                "modelId must match ${MODEL_ID_PATTERN.pattern} and contain at most 64 characters",
+            )
+        }
+    }
+
+    private fun closeAfterFailedLoad(
+        failure: Throwable,
+        model: DecoderLanguageModel?,
+        modelManager: NDManager,
+        rootManager: NDManager,
+    ) {
+        listOfNotNull<AutoCloseable>(model, modelManager, rootManager).forEach { resource ->
+            try {
+                resource.close()
+            } catch (closeFailure: Throwable) {
+                failure.addSuppressed(closeFailure)
+            }
+        }
+    }
+
+    private companion object {
+        val MODEL_ID_PATTERN = Regex("[a-z0-9][a-z0-9._-]{0,63}")
+    }
+}
+
+class InferenceRuntime internal constructor(
+    val metadata: InferenceModelMetadata,
+    private val tokenizer: Tokenizer,
+    private val rootManager: NDManager,
+    private val modelManager: NDManager,
+    private val model: DecoderLanguageModel,
+) : AutoCloseable {
+    private val parameterStore = ParameterStore(modelManager, false)
+    private val lifecycleLock = ReentrantLock(true)
+    private val closed = AtomicBoolean(false)
+    private val completedRequests = AtomicLong(0)
+
+    val isClosed: Boolean
+        get() = closed.get()
+
+    fun generate(request: TokenGenerationRequest): GenerationResult = lifecycleLock.withLock {
+        requireOpen()
+        val requestNumber = completedRequests.get() + 1
+        rootManager.newSubManager().use { requestManager ->
+            requestManager.name = "inference-request-$requestNumber"
+            val generator = AutoregressiveGenerator(
+                metadata.contextLength,
+                metadata.vocabularySize,
+                TokenSampler(request.seed),
+            ) { context -> lastTokenLogits(requestManager, context) }
+            val result = generator.generate(
+                request.promptTokenIds,
+                request.maxNewTokens,
+                request.eosTokenId,
+                request.sampling,
+            )
+            completedRequests.incrementAndGet()
+            result
+        }
+    }
+
+    fun complete(request: CompletionRequest): CompletionResult {
+        val promptTokenIds = tokenizer.encode(request.prompt, addBos = request.addBos)
+        if (promptTokenIds.isEmpty()) {
+            throw InferenceException("Prompt must produce at least one token; provide text or enable addBos")
+        }
+        val generation = generate(
+            TokenGenerationRequest(
+                promptTokenIds = promptTokenIds,
+                maxNewTokens = request.maxNewTokens,
+                sampling = request.sampling,
+                seed = request.seed,
+            ),
+        )
+        return try {
+            CompletionResult(
+                modelId = metadata.modelId,
+                checkpointId = metadata.checkpointId,
+                prompt = request.prompt,
+                generatedText = tokenizer.decode(generation.generatedTokenIds),
+                completeText = tokenizer.decode(generation.allTokenIds),
+                promptTokens = generation.promptTokenIds.size,
+                generatedTokens = generation.generatedTokenIds.size,
+                stoppedByEos = generation.stoppedByEos,
+                generation = generation,
+            )
+        } catch (exception: TokenizerException) {
+            throw InferenceException(
+                "Generated token IDs do not form valid text: ${generation.generatedTokenIds.contentToString()}",
+                exception,
+            )
+        }
+    }
+
+    fun diagnostics(): InferenceRuntimeDiagnostics = lifecycleLock.withLock {
+        requireOpen()
+        InferenceRuntimeDiagnostics(
+            completedRequests = completedRequests.get(),
+            managedArrayCount = modelManager.managedArrays.size,
+            concurrencyPolicy = metadata.concurrencyPolicy,
+        )
+    }
+
+    override fun close() {
+        lifecycleLock.withLock {
+            if (!closed.compareAndSet(false, true)) return
+            var failure: Throwable? = null
+            try {
+                model.close()
+            } catch (throwable: Throwable) {
+                failure = throwable
+            }
+            try {
+                modelManager.close()
+            } catch (throwable: Throwable) {
+                if (failure == null) failure = throwable else failure.addSuppressed(throwable)
+            }
+            try {
+                rootManager.close()
+            } catch (throwable: Throwable) {
+                if (failure == null) failure = throwable else failure.addSuppressed(throwable)
+            }
+            failure?.let { throw it }
+        }
+    }
+
+    private fun lastTokenLogits(requestManager: NDManager, context: IntArray): FloatArray =
+        requestManager.newSubManager().use { tokenManager ->
+            val input = tokenManager.create(context.map(Int::toLong).toLongArray(), Shape(1, context.size.toLong()))
+            val logits = model.forward(parameterStore, NDList(input), false).singletonOrThrow()
+            logits.get("0, ${context.lastIndex}, :").toFloatArray()
+        }
+
+    private fun requireOpen() {
+        if (closed.get()) throw InferenceException("Inference runtime '${metadata.modelId}' is closed")
+    }
+}
+
+enum class InferenceModelKind {
+    BASE,
+}
+
+enum class InferenceConcurrencyPolicy {
+    SERIALIZED,
+}
+
+data class InferenceModelMetadata(
+    val modelId: String,
+    val kind: InferenceModelKind,
+    val checkpointId: String,
+    val checkpointSha256: String,
+    val vocabularySize: Int,
+    val contextLength: Int,
+    val parameterCount: Long,
+    val tokenizerType: String,
+    val concurrencyPolicy: InferenceConcurrencyPolicy,
+)
+
+data class TokenGenerationRequest(
+    val promptTokenIds: IntArray,
+    val maxNewTokens: Int = 16,
+    val sampling: SamplingOptions = SamplingOptions(),
+    val seed: Long = 42,
+    val eosTokenId: Int = SpecialToken.EOS.id,
+)
+
+data class CompletionRequest(
+    val prompt: String,
+    val maxNewTokens: Int = 16,
+    val sampling: SamplingOptions = SamplingOptions(),
+    val seed: Long = 42,
+    val addBos: Boolean = false,
+)
+
+data class CompletionResult(
+    val modelId: String,
+    val checkpointId: String,
+    val prompt: String,
+    val generatedText: String,
+    val completeText: String,
+    val promptTokens: Int,
+    val generatedTokens: Int,
+    val stoppedByEos: Boolean,
+    val generation: GenerationResult,
+) {
+    val totalTokens: Int = promptTokens + generatedTokens
+}
+
+data class InferenceRuntimeDiagnostics(
+    val completedRequests: Long,
+    val managedArrayCount: Int,
+    val concurrencyPolicy: InferenceConcurrencyPolicy,
+)

@@ -18,6 +18,7 @@ flowchart LR
 - `checkpoint` crée depuis PR10 les runs, manifestes, checksums, métriques et round-trips de poids.
 - `generation` transforme depuis PR11 les derniers logits en token avec greedy ou sampling filtré, puis maintient la boucle autorégressive.
 - `evaluation` calcule depuis PR12 validation loss, perplexité et débit sans backward ni modification des poids.
+- `inference` possède depuis PR14 le modèle chargé, le tokenizer, les scopes de requête et la limite de concurrence, sans connaître HTTP.
 - `cli` rend chaque concept exécutable depuis Gradle.
 - `tokenizer` et `data` préparent les `IntArray`; `model` les convertira progressivement en calcul neuronal DJL.
 
@@ -30,7 +31,7 @@ flowchart LR
 - JDK 25, Gradle 9.1+ et Kotlin/JVM;
 - aucune dépendance DJL n'a été ajoutée avant le premier tenseur en PR05; le code du modèle dépend de l'API DJL et non des classes internes PyTorch.
 
-## État après PR12
+## État après PR14
 
 ```mermaid
 flowchart LR
@@ -57,6 +58,9 @@ flowchart LR
     LOAD --> EVAL[Évaluation sans gradient]
     VAL[Validation BPE<br/>checksum vérifié] --> EVAL
     EVAL --> METRICS[Loss, perplexité<br/>tokens/s]
+    CKPT --> RUNTIME[InferenceRuntime<br/>chargé une fois]
+    RUNTIME --> REQUEST[Scope DJL par requête<br/>concurrence sérialisée]
+    REQUEST --> LAST
 ```
 
-Le forward, la boucle d'entraînement, les checkpoints, la génération et l'évaluation de corpus existent. PR12 sépare physiquement train et validation, entraîne le tokenizer sur train seulement, vérifie leurs checksums et compare plusieurs checkpoints sur les mêmes fenêtres. Le KV cache, la reprise AdamW exacte et une qualité suffisante pour lancer le 17 M restent hors périmètre.
+Le forward, la boucle d'entraînement, les checkpoints, la génération et l'évaluation de corpus existent. PR14 conserve maintenant modèle et tokenizer dans un runtime réutilisable, capte les temporaires dans un scope par requête et publie une concurrence sérialisée. Le KV cache, la reprise AdamW exacte et une qualité suffisante pour lancer le 17 M restent hors périmètre.

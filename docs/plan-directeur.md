@@ -1,6 +1,6 @@
 # Plan directeur de `lxp-mini-1xm`
 
-> Statut : PR01 à PR12 terminées; stabilisation de la mémoire native DJL en cours avant PR13; trajectoire post-PR13 planifiée jusqu'au chatbot, à l'alignement et aux expériences MoE
+> Statut : PR01 à PR14 terminées; runtime d'inférence réutilisable validé; PR15 cible le cache KV et la gestion du contexte
 > Source de vérité initiale : [`docs2/project.md`](../docs2/project.md)  
 > Dernière mise à jour : 2026-08-30
 
@@ -521,6 +521,8 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 ### Phase 2 - Servir le modèle dense
 
 #### PR14 - Inference Runtime
+
+**Statut :** implémentée le 2026-08-30 sur `feature/pr14-inference-runtime`. Le test compare le pipeline PR11, exécute 100 requêtes successives et vérifie la fermeture; le laboratoire mesure aussi 100 chargements contre une instance réutilisée.
 
 **Construire :** `InferenceRuntime` chargé une seule fois avec config, tokenizer et checkpoint; API Kotlin `complete()`/`generate()`; modèle `base` identifié par un ID stable; limites de concurrence explicites.
 

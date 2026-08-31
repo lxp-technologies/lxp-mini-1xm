@@ -40,6 +40,9 @@ Ce dossier accompagne le code dans l'ordre où les concepts sont construits. Ne 
 34. [Mémoire native DJL : paramètres et temporaires](architecture/djl-memory-management.md)
 35. [ADR : temporaires du forward possédés par le batch](architecture/decisions/0008-batch-owned-forward-temporaries.md)
 36. [Correctif avant PR13 : soak test des NDManager](lab-notes/pr-13-djl-manager-lifetime-fix.md)
-37. [Plan complet des PR](plan-directeur.md)
+37. [Runtime d'inférence réutilisable](14-inference-runtime.md)
+38. [ADR : runtime chargé une fois et sérialisé](architecture/decisions/0009-single-loaded-serialized-inference-runtime.md)
+39. [PR14 : comparer 100 chargements à un runtime](lab-notes/pr-14-inference-runtime.md)
+40. [Plan complet des PR](plan-directeur.md)
 
 Les prochains chapitres seront ajoutés avec leur implémentation. Un document ne prétendra jamais qu'un composant fonctionne avant que sa PR fournisse les tests correspondants.
