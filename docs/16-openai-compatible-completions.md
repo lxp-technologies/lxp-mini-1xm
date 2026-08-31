@@ -158,3 +158,34 @@ $tokenizerPath = "build/labs/pr16/playground-tokenizer-$labId.json"
 Ouvrir ensuite `http://localhost:8080/`. La sélection CPU/GPU, CUDA, la VRAM et la limite du faux « system prompt »
 sont détaillées dans [Device runtime et playground](architecture/runtime-device-and-playground.md) et
 [ADR 0012](architecture/decisions/0012-central-runtime-device-and-replaceable-chat-format.md).
+
+### Pourquoi le quick-start ne répond pas en anglais
+
+`checkpoint-demo` n'utilise aucun corpus : ses 81 updates répètent uniquement les bytes de `abc `. Ses `6 752`
+paramètres vérifient le checkpoint, le cache KV et le serveur, mais le modèle n'a statistiquement rien appris sur les
+mots anglais ni sur le format `System/User/Assistant`. Une température basse retire de l'aléatoire; elle ne crée pas
+une connaissance absente des poids.
+
+```mermaid
+flowchart LR
+    ABC[Batch synthétique abc] --> TINY[Checkpoint 6 752 paramètres]
+    TINY --> HTTP[Validation runtime et HTTP]
+    TINY -. aucune donnée anglaise .-> NO[Pas de capacité linguistique]
+    STORIES[Corpus TinyStories anglais] --> TRAIN[Entraînement mesuré]
+    TRAIN --> BASE[Modèle base anglophone]
+    BASE --> SFT[Chat template et SFT ultérieurs]
+```
+
+Le workspace contient le corpus TinyStories préparé, son tokenizer BPE 512 et le preset 17,3 M. Voici la vraie entrée
+du parcours anglophone; `--updates 1000` est un premier palier de mesure, pas une garantie de qualité :
+
+```powershell
+$runDir = "build/runs/tinystories-17m-$(Get-Date -Format yyyyMMdd-HHmmss)"
+.\gradlew.bat run --args="train corpus --config configs/mini-17m-tinystories-512.yaml --tokenizer artifacts/tokenizers/tinystories-en/bpe-512.json --train-corpus data/prepared/tinystories-en/train.txt --validation-corpus data/prepared/tinystories-en/validation.txt --run-dir $runDir --updates 1000 --eval-every 100 --checkpoint-every 100 --shuffle-buffer 256 --max-validation-batches 20 --prompt 'Once upon a time' --sample-tokens 32"
+```
+
+Sur la mesure locale PR13, le preset 17 M traitait environ `265 tokens/s`, soit près de 15 secondes par update de
+4 096 tokens sur CPU. Mille updates représentent donc plusieurs heures, auxquelles s'ajoute l'évaluation. Il faut
+suivre la validation loss et les samples avant de présenter ce checkpoint comme anglophone. Même bien préentraîné,
+il restera un modèle base de continuation; répondre correctement à des tours de chat exige encore Chat Template et
+SFT, prévus par le plan directeur.

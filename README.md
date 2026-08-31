@@ -21,7 +21,9 @@ de vrais deltas SSE. Consulte le [chapitre PR16](docs/16-openai-compatible-compl
 [note de laboratoire](docs/lab-notes/pr-16-openai-completions.md) pour les commandes complètes. Pour interdire SSE,
 démarre plutôt le serveur avec `--no-streaming-enabled`; les completions non-streamées restent disponibles.
 Les completions texte masquent les byte tokens qui rendraient la sortie UTF-8 invalide; le tiny modèle peut néanmoins
-produire du texte incohérent tant qu'il n'est pas suffisamment entraîné.
+produire du texte incohérent tant qu'il n'est pas suffisamment entraîné. Le quick-start entraîne précisément le motif
+synthétique `abc ` : il valide le serveur, mais il n'a jamais appris l'anglais. Le playground utilise greedy par
+défaut pour rendre cette limite reproductible plutôt que de l'amplifier avec du sampling.
 
 Inspecte les devices avec `.\gradlew.bat run --args="runtime info --device auto"`. Sur Windows NVIDIA,
 `-PpytorchNative=cuda` verrouille PyTorch 2.7.1/cu128 et `--device cuda:0` exige le GPU sans fallback.

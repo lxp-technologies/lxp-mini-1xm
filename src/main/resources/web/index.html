@@ -26,7 +26,8 @@
     <aside class="base-warning">
         <strong>Expérience de formatage, pas encore un chatbot.</strong>
         Les rôles et le « system prompt » deviennent du texte ordinaire. Le modèle base n’a pas encore appris leur
-        hiérarchie; Chat Template et SFT arriveront dans une PR ultérieure.
+        hiérarchie. Le checkpoint quick-start mémorise seulement <code>abc </code> et ne sait pas générer de l'anglais;
+        il faut charger un checkpoint entraîné sur corpus. Chat Template et SFT arriveront dans une PR ultérieure.
     </aside>
 
     <section class="workspace">
@@ -55,11 +56,11 @@
             <p class="eyebrow">CONTRÔLES</p>
             <h2>Contexte et sampling</h2>
             <label for="system-prompt">Préfixe « system » expérimental</label>
-            <textarea id="system-prompt" rows="5">Tu es un assistant concis.</textarea>
+            <textarea id="system-prompt" rows="5">You are a concise English assistant.</textarea>
 
             <div class="control-grid">
                 <label>Température
-                    <input id="temperature" type="number" min="0" max="2" step="0.1" value="0.8">
+                    <input id="temperature" type="number" min="0" max="2" step="0.1" value="0">
                 </label>
                 <label>Nouveaux tokens
                     <input id="max-new-tokens" type="number" min="1" value="32">

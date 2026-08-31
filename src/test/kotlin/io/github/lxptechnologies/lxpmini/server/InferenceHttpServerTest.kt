@@ -67,7 +67,7 @@ class InferenceHttpServerTest {
             val playground = get("$baseUrl/")
             assertThat(playground.statusCode()).isEqualTo(200)
             assertThat(playground.headers().firstValue("content-type").orElse("")).startsWith("text/html")
-            assertThat(playground.body()).contains("LXP Mini", "pas encore un chatbot")
+            assertThat(playground.body()).contains("LXP Mini", "pas encore un chatbot", "mémorise seulement")
             assertThat(get("$baseUrl/app.css").statusCode()).isEqualTo(200)
             val javascript = get("$baseUrl/app.js")
             assertThat(javascript.statusCode()).isEqualTo(200)
@@ -175,7 +175,6 @@ class InferenceHttpServerTest {
                         {"role":"assistant","content":"Hi"}
                     ],
                     "user_message":"Continue",
-                    "temperature":0,
                     "max_new_tokens":2,
                     "top_p":1.0,
                     "top_k":0

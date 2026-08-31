@@ -85,7 +85,7 @@ data class PlaygroundCompletionRequest(
     @com.fasterxml.jackson.annotation.JsonProperty("system_prompt") val systemPrompt: String? = null,
     val messages: List<PlaygroundMessage> = emptyList(),
     @com.fasterxml.jackson.annotation.JsonProperty("user_message") val userMessage: String,
-    val temperature: Double = 0.8,
+    val temperature: Double = 0.0,
     @com.fasterxml.jackson.annotation.JsonProperty("max_new_tokens") val maxNewTokens: Int = 32,
     @com.fasterxml.jackson.annotation.JsonProperty("top_p") val topP: Double = 0.95,
     @com.fasterxml.jackson.annotation.JsonProperty("top_k") val topK: Int = 0,

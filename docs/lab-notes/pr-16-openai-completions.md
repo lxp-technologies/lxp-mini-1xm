@@ -156,6 +156,12 @@ Le smoke test réel a chargé le modèle CPU à contexte 256, servi `/` et `/app
 le transport et le formatage fonctionnent, mais la sortie illustre précisément pourquoi ce checkpoint base n'est pas
 encore un chatbot.
 
+Une vérification supplémentaire avec `Hi!` a confirmé la frontière : le checkpoint quick-start de `6 752`
+paramètres produit des bytes Unicode valides, mais pas une phrase anglaise, puisqu'il a seulement vu `abc `. Les runs
+TinyStories 17 M présents au moment de l'expérience n'avaient que deux updates et une validation loss proche de
+`6,19`; ils ne constituent pas encore un checkpoint linguistique. Aucun filtre de caractères ne peut remplacer les
+données et les optimizer updates manquants.
+
 ## Expérience D - Reproduire une sortie UTF-8 invalide
 
 Le tiny modèle peut favoriser des byte tokens qui ne forment pas du UTF-8 valide. Avant le correctif PR16, le
