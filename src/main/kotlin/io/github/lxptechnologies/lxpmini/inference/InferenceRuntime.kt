@@ -9,6 +9,7 @@ import io.github.lxptechnologies.lxpmini.checkpoint.Sha256
 import io.github.lxptechnologies.lxpmini.config.ConfigLoader
 import io.github.lxptechnologies.lxpmini.generation.AutoregressiveGenerator
 import io.github.lxptechnologies.lxpmini.generation.GenerationResult
+import io.github.lxptechnologies.lxpmini.generation.GenerationStep
 import io.github.lxptechnologies.lxpmini.generation.SamplingOptions
 import io.github.lxptechnologies.lxpmini.generation.TokenSampler
 import io.github.lxptechnologies.lxpmini.model.DecoderLanguageModel
@@ -17,6 +18,7 @@ import io.github.lxptechnologies.lxpmini.tokenizer.Tokenizer
 import io.github.lxptechnologies.lxpmini.tokenizer.TokenizerArtifactLoader
 import io.github.lxptechnologies.lxpmini.tokenizer.TokenizerException
 import java.nio.file.Path
+import java.time.Instant
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock
@@ -78,6 +80,7 @@ class InferenceRuntimeLoader(
                     parameterCount = model.actualParameterCount(),
                     tokenizerType = tokenizerArtifact.type,
                     concurrencyPolicy = InferenceConcurrencyPolicy.SERIALIZED,
+                    createdAtEpochSeconds = Instant.parse(runMetadata.createdAtUtc).epochSecond,
                 ),
                 tokenizer = tokenizerArtifact.tokenizer,
                 rootManager = rootManager,
@@ -135,9 +138,24 @@ class InferenceRuntime internal constructor(
     val isClosed: Boolean
         get() = closed.get()
 
+    fun countPromptTokens(prompt: String, addBos: Boolean = false): Int = lifecycleLock.withLock {
+        requireOpen()
+        tokenizer.encode(prompt, addBos = addBos).size
+    }
+
     fun generate(request: TokenGenerationRequest): GenerationResult = generateWithMetrics(request).generation
 
-    fun generateWithMetrics(request: TokenGenerationRequest): InferenceGenerationResult = lifecycleLock.withLock {
+    fun generateWithMetrics(request: TokenGenerationRequest): InferenceGenerationResult = generateInternal(request)
+
+    fun generateStreaming(
+        request: TokenGenerationRequest,
+        onStep: (GenerationStep) -> Unit,
+    ): InferenceGenerationResult = generateInternal(request, onStep)
+
+    private fun generateInternal(
+        request: TokenGenerationRequest,
+        onStep: (GenerationStep) -> Unit = {},
+    ): InferenceGenerationResult = lifecycleLock.withLock {
         requireOpen()
         validateContextBudget(request)
         val requestNumber = completedRequests.get() + 1
@@ -155,6 +173,7 @@ class InferenceRuntime internal constructor(
                     request.maxNewTokens,
                     request.eosTokenId,
                     request.sampling,
+                    onStep,
                 )
                 completedRequests.incrementAndGet()
                 InferenceGenerationResult(
@@ -169,40 +188,82 @@ class InferenceRuntime internal constructor(
     }
 
     fun complete(request: CompletionRequest): CompletionResult {
+        val promptTokenIds = encodePrompt(request)
+        val detailedGeneration = generateWithMetrics(request.toTokenGenerationRequest(promptTokenIds))
+        return completionResult(request, detailedGeneration.generation, detailedGeneration.metrics)
+    }
+
+    fun completeStreaming(
+        request: CompletionRequest,
+        onTextDelta: (String) -> Unit,
+    ): CompletionResult = completeInternal(request, onTextDelta)
+
+    private fun completeInternal(
+        request: CompletionRequest,
+        onTextDelta: (String) -> Unit,
+    ): CompletionResult {
+        val promptTokenIds = encodePrompt(request)
+        val generatedTokenIds = ArrayList<Int>(request.maxNewTokens.coerceAtLeast(0))
+        var emittedText = ""
+        val detailedGeneration = generateStreaming(request.toTokenGenerationRequest(promptTokenIds)) { step ->
+            generatedTokenIds += step.sampling.tokenId
+            val decoded = try {
+                tokenizer.decode(generatedTokenIds.toIntArray())
+            } catch (_: TokenizerException) {
+                return@generateStreaming
+            }
+            if (!decoded.startsWith(emittedText)) {
+                throw InferenceException("Tokenizer streaming output is not prefix-stable")
+            }
+            val delta = decoded.substring(emittedText.length)
+            if (delta.isNotEmpty()) {
+                onTextDelta(delta)
+                emittedText = decoded
+            }
+        }
+        val generation = detailedGeneration.generation
+        return completionResult(request, generation, detailedGeneration.metrics)
+    }
+
+    private fun encodePrompt(request: CompletionRequest): IntArray {
         val promptTokenIds = tokenizer.encode(request.prompt, addBos = request.addBos)
         if (promptTokenIds.isEmpty()) {
             throw InferenceException("Prompt must produce at least one token; provide text or enable addBos")
         }
-        val detailedGeneration = generateWithMetrics(
-            TokenGenerationRequest(
-                promptTokenIds = promptTokenIds,
-                maxNewTokens = request.maxNewTokens,
-                sampling = request.sampling,
-                seed = request.seed,
-                cacheEnabled = request.cacheEnabled,
-                contextPolicy = request.contextPolicy,
-            ),
+        return promptTokenIds
+    }
+
+    private fun CompletionRequest.toTokenGenerationRequest(promptTokenIds: IntArray) = TokenGenerationRequest(
+        promptTokenIds = promptTokenIds,
+        maxNewTokens = maxNewTokens,
+        sampling = sampling,
+        seed = seed,
+        cacheEnabled = cacheEnabled,
+        contextPolicy = contextPolicy,
+    )
+
+    private fun completionResult(
+        request: CompletionRequest,
+        generation: GenerationResult,
+        metrics: InferenceMetrics,
+    ): CompletionResult = try {
+        CompletionResult(
+            modelId = metadata.modelId,
+            checkpointId = metadata.checkpointId,
+            prompt = request.prompt,
+            generatedText = tokenizer.decode(generation.generatedTokenIds),
+            completeText = tokenizer.decode(generation.allTokenIds),
+            promptTokens = generation.promptTokenIds.size,
+            generatedTokens = generation.generatedTokenIds.size,
+            stoppedByEos = generation.stoppedByEos,
+            generation = generation,
+            metrics = metrics,
         )
-        val generation = detailedGeneration.generation
-        return try {
-            CompletionResult(
-                modelId = metadata.modelId,
-                checkpointId = metadata.checkpointId,
-                prompt = request.prompt,
-                generatedText = tokenizer.decode(generation.generatedTokenIds),
-                completeText = tokenizer.decode(generation.allTokenIds),
-                promptTokens = generation.promptTokenIds.size,
-                generatedTokens = generation.generatedTokenIds.size,
-                stoppedByEos = generation.stoppedByEos,
-                generation = generation,
-                metrics = detailedGeneration.metrics,
-            )
-        } catch (exception: TokenizerException) {
-            throw InferenceException(
-                "Generated token IDs do not form valid text: ${generation.generatedTokenIds.contentToString()}",
-                exception,
-            )
-        }
+    } catch (exception: TokenizerException) {
+        throw InferenceException(
+            "Generated token IDs do not form valid text: ${generation.generatedTokenIds.contentToString()}",
+            exception,
+        )
     }
 
     fun diagnostics(): InferenceRuntimeDiagnostics = lifecycleLock.withLock {
@@ -278,6 +339,7 @@ data class InferenceModelMetadata(
     val parameterCount: Long,
     val tokenizerType: String,
     val concurrencyPolicy: InferenceConcurrencyPolicy,
+    val createdAtEpochSeconds: Long,
 )
 
 data class TokenGenerationRequest(

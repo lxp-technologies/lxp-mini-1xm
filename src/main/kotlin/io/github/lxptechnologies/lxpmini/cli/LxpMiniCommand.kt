@@ -21,6 +21,7 @@ import java.util.concurrent.Callable
         InferenceCommand::class,
         EvaluateCommand::class,
         ExperimentCommand::class,
+        ServeCommand::class,
     ],
 )
 class LxpMiniCommand : Runnable {

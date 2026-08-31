@@ -19,6 +19,7 @@ flowchart LR
 - `generation` transforme depuis PR11 les derniers logits en token avec greedy ou sampling filtré, puis maintient la boucle autorégressive.
 - `evaluation` calcule depuis PR12 validation loss, perplexité et débit sans backward ni modification des poids.
 - `inference` possède depuis PR14 le modèle chargé, le tokenizer, les scopes et la limite de concurrence; PR15 y ajoute un cache KV isolé par requête, les politiques de contexte et les métriques prefill/decode, sans connaître HTTP.
+- `server` adapte depuis PR16 un sous-ensemble strict de l'API OpenAI vers le runtime, avec JSON normal et SSE activable sans posséder le modèle.
 - `cli` rend chaque concept exécutable depuis Gradle.
 - `tokenizer` et `data` préparent les `IntArray`; `model` les convertira progressivement en calcul neuronal DJL.
 
@@ -31,7 +32,7 @@ flowchart LR
 - JDK 25, Gradle 9.1+ et Kotlin/JVM;
 - aucune dépendance DJL n'a été ajoutée avant le premier tenseur en PR05; le code du modèle dépend de l'API DJL et non des classes internes PyTorch.
 
-## État après PR15
+## État après PR16
 
 ```mermaid
 flowchart LR
@@ -65,6 +66,11 @@ flowchart LR
     PREFILL --> KV[Cache K/V par couche<br/>B x H x S x D]
     KV --> DECODE[Decode un token]
     DECODE --> LAST
+    RUNTIME --> HTTP[Spring MVC local]
+    HTTP --> VALIDATE[Contrat OpenAI strict]
+    VALIDATE --> REQUEST
+    TOKEN --> JSON[Completion JSON]
+    TOKEN --> SSE[Deltas SSE opt-in]
 ```
 
-Le forward, la boucle d'entraînement, les checkpoints, la génération et l'évaluation de corpus existent. PR15 conserve K/V par couche pendant une requête, distingue prefill et decode, puis ferme cet état avec son scope. La reprise AdamW exacte et une qualité suffisante pour lancer le 17 M restent hors périmètre.
+Le forward, la boucle d'entraînement, les checkpoints, la génération et l'évaluation de corpus existent. PR15 conserve K/V par couche pendant une requête. PR16 charge ce runtime dans un serveur local, refuse les capacités absentes et expose au choix une réponse JSON ou de vrais deltas SSE. La reprise AdamW exacte et une qualité suffisante pour lancer le 17 M restent hors périmètre.

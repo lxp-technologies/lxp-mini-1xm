@@ -156,6 +156,34 @@ class InferenceRuntimeTest {
         }
     }
 
+    @Test
+    fun `streaming emits the same text and releases the request when the consumer disconnects`() {
+        val artifacts = createArtifacts()
+        InferenceRuntimeLoader().load(MODEL_ID, artifacts.runDirectory, artifacts.tokenizerPath).use { runtime ->
+            val request = CompletionRequest(
+                prompt = "abc",
+                maxNewTokens = 3,
+                sampling = SamplingOptions(strategy = SamplingStrategy.GREEDY),
+                contextPolicy = ContextOverflowPolicy.REJECT,
+            )
+            val expected = runtime.complete(request)
+            val streamedText = StringBuilder()
+            val streamed = runtime.completeStreaming(request, streamedText::append)
+
+            assertThat(streamed.generation.generatedTokenIds).containsExactly(*expected.generation.generatedTokenIds)
+            assertThat(streamedText.toString()).isEqualTo(expected.generatedText)
+
+            val beforeFailure = runtime.diagnostics()
+            assertThatThrownBy {
+                runtime.completeStreaming(request) { throw ClientDisconnectedException() }
+            }.isInstanceOf(ClientDisconnectedException::class.java)
+            val afterFailure = runtime.diagnostics()
+            assertThat(afterFailure.completedRequests).isEqualTo(beforeFailure.completedRequests)
+            assertThat(afterFailure.managedArrayCount).isEqualTo(beforeFailure.managedArrayCount)
+            assertThat(runtime.complete(request).generatedText).isEqualTo(expected.generatedText)
+        }
+    }
+
     private fun createArtifacts(): InferenceArtifacts {
         val runDirectory = temporaryDirectory.resolve("run-${System.nanoTime()}")
         val tokenizerPath = temporaryDirectory.resolve("tokenizer-${System.nanoTime()}.json")
@@ -210,3 +238,5 @@ class InferenceRuntimeTest {
         const val MODEL_ID = "lxp-mini-pr14-test"
     }
 }
+
+private class ClientDisconnectedException : RuntimeException("client disconnected")

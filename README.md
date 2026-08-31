@@ -2,6 +2,25 @@
 
 Petit modèle de langage decoder-only construit progressivement from scratch en Kotlin/JVM. Chaque PR introduit un concept exécutable, testé et documenté.
 
+## PR16 - Servir des completions OpenAI-compatible
+
+Prépare un tiny checkpoint, puis démarre un serveur local. Le streaming est désactivé par défaut; ajoute
+`--streaming-enabled` pour autoriser les requêtes SSE :
+
+```powershell
+$labId = Get-Date -Format yyyyMMdd-HHmmss
+$runDir = "build/labs/pr16/demo-$labId"
+$tokenizerPath = "build/labs/pr16/tokenizer-$labId.json"
+.\gradlew.bat run --args="tokenizer byte create --output $tokenizerPath"
+.\gradlew.bat run --args="train checkpoint-demo --config configs/lab-pr09-tiny.yaml --run-dir $runDir --before-updates 80 --after-updates 1"
+.\gradlew.bat run --args="serve --model-id lxp-mini-pr16-tiny-base --run-dir $runDir --tokenizer $tokenizerPath --port 8080 --streaming-enabled"
+```
+
+Dans un second PowerShell, une requête garde `stream:false` pour un JSON unique ou utilise `stream:true` pour recevoir
+de vrais deltas SSE. Consulte le [chapitre PR16](docs/16-openai-compatible-completions.md) et la
+[note de laboratoire](docs/lab-notes/pr-16-openai-completions.md) pour les commandes complètes. Pour interdire SSE,
+démarre plutôt le serveur avec `--no-streaming-enabled`; les completions non-streamées restent disponibles.
+
 ## PR15 - Accélérer le décodage avec un cache KV
 
 Prépare un tiny model à contexte 256, puis compare cache et recalcul sur 32, 64 et 128 tokens :

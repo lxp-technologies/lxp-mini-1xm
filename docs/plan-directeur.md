@@ -1,6 +1,6 @@
 # Plan directeur de `lxp-mini-1xm`
 
-> Statut : PR01 à PR15 terminées; cache KV isolé et politiques de contexte validés; PR16 cible le serveur HTTP de completions
+> Statut : PR01 à PR16 terminées; completions JSON et streaming SSE opt-in validés; PR17 cible le durcissement du streaming
 > Source de vérité initiale : [`docs2/project.md`](../docs2/project.md)  
 > Dernière mise à jour : 2026-08-30
 
@@ -546,6 +546,10 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 
 #### PR16 - Serveur HTTP et OpenAI-compatible completions
 
+**Statut :** implémentée le 2026-08-30 sur `feature/pr16-openai-completions`. Spring MVC charge un runtime unique,
+expose le sous-ensemble documenté, refuse les champs sans traduction et permet d'activer ou désactiver le vrai
+streaming SSE au démarrage.
+
 **Construire :** serveur Kotlin léger (Ktor à évaluer au début de la PR, mais réelle préférence pour Spring Boot), binding `127.0.0.1` par défaut, `GET /health`, `GET /v1/models`, `GET /v1/models/{model}`, `POST /v1/completions`, erreurs JSON cohérentes et comptage `usage`.
 
 **Compatibilité :** implémenter seulement les champs qui ont une traduction réelle vers le runtime (`model`, `prompt`, limite de génération, température, top-p, seed/stop lorsque supportés). Les champs inconnus ou non supportés ne doivent pas être silencieusement ignorés.
@@ -556,7 +560,10 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 
 #### PR17 - Streaming SSE
 
-**Construire :** `stream=true`, chunks au fil des tokens, terminaison propre, annulation client et libération immédiate du scope d'inférence.
+**Base intégrée en PR16 :** `stream=true`, chunks au fil des tokens, terminaison `[DONE]`, interruption sur déconnexion
+et libération du scope d'inférence sont déjà présents afin que le streaming puisse être activé ou désactivé dès PR16.
+
+**Construire :** durcir cette base avec soak tests, observation de backpressure et validation avec les clients ciblés.
 
 **Tests :** ordre des chunks, texte final équivalent au non-streaming à seed/stratégie compatibles, client disconnect sans fuite.
 

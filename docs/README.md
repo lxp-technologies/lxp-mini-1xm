@@ -46,6 +46,9 @@ Ce dossier accompagne le code dans l'ordre où les concepts sont construits. Ne 
 40. [Cache KV et gestion du contexte](15-kv-cache-and-context.md)
 41. [ADR : cache KV isolé par requête](architecture/decisions/0010-request-scoped-kv-cache.md)
 42. [PR15 : mesurer 32, 64 et 128 tokens](lab-notes/pr-15-kv-cache-and-context.md)
-43. [Plan complet des PR](plan-directeur.md)
+43. [Serveur OpenAI-compatible et streaming SSE](16-openai-compatible-completions.md)
+44. [ADR : adaptateur strict et SSE opt-in](architecture/decisions/0011-strict-openai-adapter-and-opt-in-sse.md)
+45. [PR16 : servir une completion JSON ou SSE](lab-notes/pr-16-openai-completions.md)
+46. [Plan complet des PR](plan-directeur.md)
 
 Les prochains chapitres seront ajoutés avec leur implémentation. Un document ne prétendra jamais qu'un composant fonctionne avant que sa PR fournisse les tests correspondants.

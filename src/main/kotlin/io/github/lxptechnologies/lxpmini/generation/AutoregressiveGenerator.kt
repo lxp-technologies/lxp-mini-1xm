@@ -16,6 +16,7 @@ class AutoregressiveGenerator(
         maxNewTokens: Int,
         eosTokenId: Int,
         options: SamplingOptions,
+        onStep: (GenerationStep) -> Unit = {},
     ): GenerationResult {
         if (promptTokenIds.isEmpty()) throw GenerationException("Prompt must contain at least one token")
         if (maxNewTokens < 0) throw GenerationException("maxNewTokens must be non-negative")
@@ -36,7 +37,9 @@ class AutoregressiveGenerator(
             val sampling = sampler.select(logits, options)
             allTokens += sampling.tokenId
             generated += sampling.tokenId
-            steps += GenerationStep(stepIndex + 1, context, sampling)
+            val step = GenerationStep(stepIndex + 1, context, sampling)
+            steps += step
+            onStep(step)
             if (sampling.tokenId == eosTokenId) {
                 stoppedByEos = true
                 break
