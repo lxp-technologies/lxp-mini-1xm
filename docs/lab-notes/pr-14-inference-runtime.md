@@ -17,11 +17,14 @@ Ces tests couvrent l'équivalence avec le pipeline PR11, 100 requêtes successiv
 
 ## 2. Préparer un modèle tiny lisible
 
-Utilise un nouveau dossier si `demo-001` existe déjà, car les runs PR10 ne sont jamais écrasés.
+Crée un identifiant horodaté et conserve la même session PowerShell pour les étapes suivantes. Les runs PR10 ne sont jamais écrasés.
 
 ```powershell
-.\gradlew.bat run --args="tokenizer byte create --output build/labs/pr14/tokenizer.json"
-.\gradlew.bat run --args="train checkpoint-demo --config configs/lab-pr09-tiny.yaml --run-dir build/labs/pr14/demo-001 --before-updates 80 --after-updates 1"
+$labId = Get-Date -Format yyyyMMdd-HHmmss
+$runDir = "build/labs/pr14/demo-$labId"
+$tokenizerPath = "build/labs/pr14/tokenizer-$labId.json"
+.\gradlew.bat run --args="tokenizer byte create --output $tokenizerPath"
+.\gradlew.bat run --args="train checkpoint-demo --config configs/lab-pr09-tiny.yaml --run-dir $runDir --before-updates 80 --after-updates 1"
 ```
 
 Ce modèle de `6 752` paramètres mémorise le motif synthétique `abc `. Il sert à vérifier le runtime, pas à estimer la qualité du futur 17 M.
@@ -29,7 +32,7 @@ Ce modèle de `6 752` paramètres mémorise le motif synthétique `abc `. Il ser
 ## 3. Réutiliser le runtime
 
 ```powershell
-.\gradlew.bat run --args="inference complete --model-id lxp-mini-pr14-tiny-base --run-dir build/labs/pr14/demo-001 --tokenizer build/labs/pr14/tokenizer.json --prompt abc --requests 3 --max-new-tokens 12 --strategy greedy"
+.\gradlew.bat run --args="inference complete --model-id lxp-mini-pr14-tiny-base --run-dir $runDir --tokenizer $tokenizerPath --prompt abc --requests 3 --max-new-tokens 12 --strategy greedy"
 ```
 
 Résultat de référence :
@@ -52,7 +55,7 @@ Runtime closed:       true
 ## 4. Comparer 100 requêtes
 
 ```powershell
-.\gradlew.bat run --args="inference benchmark --model-id lxp-mini-pr14-tiny-base --run-dir build/labs/pr14/demo-001 --tokenizer build/labs/pr14/tokenizer.json --prompt abc --requests 100 --max-new-tokens 1"
+.\gradlew.bat run --args="inference benchmark --model-id lxp-mini-pr14-tiny-base --run-dir $runDir --tokenizer $tokenizerPath --prompt abc --requests 100 --max-new-tokens 1"
 ```
 
 Mesure locale officielle de PR14 :
@@ -74,11 +77,17 @@ xychart-beta
 
 Ce ratio dépend fortement du disque, du moteur déjà initialisé, du modèle, du contexte et du nombre de tokens. Il prouve que le cycle de vie compte; il ne prédit pas la latence du 17 M ni le gain du futur cache KV.
 
+Une seconde exécution sur la même machine a mesuré `1 144,63 ms` contre `87,24 ms`, soit `13,12x`. Cette variation normale illustre pourquoi un benchmark sérieux rapporte plusieurs répétitions et une distribution plutôt qu'un seul nombre.
+
 ## Questions et réponses
 
 ### Pourquoi le benchmark génère-t-il seulement un token?
 
 Pour rendre le coût de chargement visible. Avec beaucoup de tokens, le recalcul autoregressif sans cache KV dominerait les deux scénarios et mesurerait surtout une limite de PR15.
+
+### Pourquoi `checkpoint-demo` refuse-t-il mon dossier?
+
+Un dossier non vide représente un run déjà initialisé avec sa configuration, ses métriques et ses checkpoints. L'écraser rendrait sa provenance ambiguë. Crée un nouveau `$runDir` horodaté comme ci-dessus; si les commandes `inference` fonctionnent avec l'ancien dossier, tu peux aussi le réutiliser sans relancer l'entraînement.
 
 ### Est-ce vraiment la CLI historique PR11?
 
