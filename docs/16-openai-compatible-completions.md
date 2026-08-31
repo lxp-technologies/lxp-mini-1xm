@@ -108,3 +108,28 @@ tout en utilisant l'auto-configuration et le serveur embarqué comme bibliothèq
 
 La décision complète est dans [ADR 0011](architecture/decisions/0011-strict-openai-adapter-and-opt-in-sse.md) et les
 commandes reproductibles sont dans le [laboratoire PR16](lab-notes/pr-16-openai-completions.md).
+
+## Extension : device et playground
+
+`GET /` sert maintenant un playground local sans React ni npm. `GET /health` ajoute paramètres, device sélectionné,
+type de modèle et longueur de contexte. `app.js` et `app.css` sont des ressources Spring; une route inconnue retourne
+une erreur 404 normalisée.
+
+Le playground appelle `POST /playground/completions`. Cet endpoint expérimental ne remplace pas le contrat OpenAI :
+il reçoit les tours conservés dans le navigateur, passe par `ChatPromptFormatter`, puis crée une `CompletionRequest`.
+Le bouton Clear ne fait aucun appel réseau.
+
+Pour un playground utilisable, choisir le preset à contexte 256 plutôt que `lab-pr09-tiny.yaml` à contexte 8 :
+
+```powershell
+$labId = Get-Date -Format yyyyMMdd-HHmmss
+$runDir = "build/labs/pr16/playground-$labId"
+$tokenizerPath = "build/labs/pr16/playground-tokenizer-$labId.json"
+.\gradlew.bat run --args="tokenizer byte create --output $tokenizerPath"
+.\gradlew.bat run --args="train checkpoint-demo --config configs/lab-pr15-kv-cache.yaml --run-dir $runDir --before-updates 80 --after-updates 1"
+.\gradlew.bat -PpytorchNative=cpu run --args="serve --model-id lxp-mini-pr16-playground-base --run-dir $runDir --tokenizer $tokenizerPath --device cpu --port 8080 --streaming-enabled"
+```
+
+Ouvrir ensuite `http://localhost:8080/`. La sélection CPU/GPU, CUDA, la VRAM et la limite du faux « system prompt »
+sont détaillées dans [Device runtime et playground](architecture/runtime-device-and-playground.md) et
+[ADR 0012](architecture/decisions/0012-central-runtime-device-and-replaceable-chat-format.md).

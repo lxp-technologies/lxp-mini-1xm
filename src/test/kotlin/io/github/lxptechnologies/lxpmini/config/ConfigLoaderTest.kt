@@ -17,6 +17,7 @@ class ConfigLoaderTest {
         assertThat(config.model.dModel).isEqualTo(384)
         assertThat(config.model.headDim).isEqualTo(64)
         assertThat(config.training.seed).isEqualTo(42)
+        assertThat(config.runtime.device).isEqualTo("auto")
     }
 
     @Test
@@ -36,6 +37,19 @@ class ConfigLoaderTest {
         assertThatThrownBy { loader.load(missing) }
             .isInstanceOf(ConfigException::class.java)
             .hasMessage("Configuration file does not exist: $missing")
+    }
+
+    @Test
+    fun `validates an explicit runtime device`(@TempDir directory: Path) {
+        val valid = directory.resolve("cpu.yaml")
+        valid.writeText(validYaml() + "\nruntime:\n  device: cpu")
+        assertThat(loader.load(valid).runtime.device).isEqualTo("cpu")
+
+        val invalid = directory.resolve("invalid-device.yaml")
+        invalid.writeText(validYaml() + "\nruntime:\n  device: cuda")
+        assertThatThrownBy { loader.load(invalid) }
+            .isInstanceOf(ConfigException::class.java)
+            .hasMessageContaining("runtime.device must be one of")
     }
 
     private fun validYaml() = """

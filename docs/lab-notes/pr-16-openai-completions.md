@@ -97,3 +97,61 @@ suite complète terminait par `BUILD SUCCESSFUL`.
 La porte PR16 est franchie : lifecycle serveur, contrat strict, comparaison runtime/API, usage et streaming réel sont
 testés. PR17 peut désormais se concentrer sur le durcissement du streaming, notamment un soak test de centaines de
 requêtes et le comportement de clients réels, plutôt que sur une première implémentation SSE.
+
+## Extension device - environnement observé
+
+Mesure du 2026-08-31 :
+
+| Élément | Valeur |
+|---|---|
+| GPU | NVIDIA GeForce RTX 4060 Laptop GPU |
+| VRAM | 8 188 MiB |
+| driver | 591.74 |
+| CUDA maximal vu par le driver | 13.1 |
+| DJL / PyTorch | 0.36.0 / 2.7.1 |
+| runtime CUDA | cu128 |
+
+`nvidia-smi` affichait environ `573 MiB` de VRAM déjà utilisée par le bureau avant le run; cette mémoire
+n'appartenait pas au modèle.
+
+```powershell
+.\gradlew.bat run --args="runtime info --device auto"
+.\gradlew.bat -PpytorchNative=cpu run --args="runtime info --device cpu"
+.\gradlew.bat -PpytorchNative=cuda run --args="runtime info --device cuda:0"
+nvidia-smi
+```
+
+Sans flavor CUDA chargé, `auto` a choisi CPU et `cuda:0` a échoué explicitement. Avec
+`-PpytorchNative=cuda`, DJL a téléchargé PyTorch/cu128, détecté un GPU et sélectionné `cuda:0`.
+
+### Même checkpoint et même seed
+
+CPU et GPU ont utilisé `step-00000081`, `prompt=abc`, greedy, seed 42 et cinq nouveaux tokens. Les deux ont produit
+exactement `" abc "`. Le débit observé était `122,74 tokens/s` sur CPU et `16,35 tokens/s` sur GPU. Ce modèle de
+`6 752` paramètres est trop petit pour amortir le lancement des kernels CUDA.
+
+### Benchmark contexte 256
+
+| Device | Tokens | cache tokens/s | recalcul tokens/s | sorties identiques |
+|---|---:|---:|---:|---|
+| CPU | 32 | 763,53 | 1 029,75 | oui |
+| CPU | 64 | 1 110,60 | 968,29 | oui |
+| CPU | 128 | 1 708,77 | 1 106,10 | oui |
+| CUDA | 32 | 352,21 | 442,38 | oui |
+| CUDA | 64 | 421,97 | 543,56 | oui |
+| CUDA | 128 | 598,00 | 567,86 | oui |
+
+Cette mesure prouve la propagation et l'équivalence sur le tiny laboratoire; elle ne permet pas de conclure que le
+CPU restera plus rapide sur le modèle 17 M.
+
+### Observer le playground
+
+Préparer un run avec `configs/lab-pr15-kv-cache.yaml`, démarrer `serve`, puis ouvrir
+`http://localhost:8080/`. Comparer une continuation avec et sans préfixe system. Un modèle base peut répéter ou
+continuer les libellés : il n'obéit pas encore à une hiérarchie de rôles. Le bouton Clear vide l'écran sans requête
+serveur.
+
+Le smoke test réel a chargé le modèle CPU à contexte 256, servi `/` et `/app.css` avec HTTP 200, puis formaté
+`System: Be concise.\nUser: abc\nAssistant:` en 40 tokens. Sa continuation greedy de huit tokens était `EEEEEEEE` :
+le transport et le formatage fonctionnent, mais la sortie illustre précisément pourquoi ce checkpoint base n'est pas
+encore un chatbot.

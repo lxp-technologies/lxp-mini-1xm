@@ -19,7 +19,8 @@ flowchart LR
 - `generation` transforme depuis PR11 les derniers logits en token avec greedy ou sampling filtré, puis maintient la boucle autorégressive.
 - `evaluation` calcule depuis PR12 validation loss, perplexité et débit sans backward ni modification des poids.
 - `inference` possède depuis PR14 le modèle chargé, le tokenizer, les scopes et la limite de concurrence; PR15 y ajoute un cache KV isolé par requête, les politiques de contexte et les métriques prefill/decode, sans connaître HTTP.
-- `server` adapte depuis PR16 un sous-ensemble strict de l'API OpenAI vers le runtime, avec JSON normal et SSE activable sans posséder le modèle.
+- `runtime` résout depuis l'extension PR16 `auto`, `cpu` ou `cuda:0` avant la création du manager racine.
+- `server` adapte depuis PR16 un sous-ensemble strict de l'API OpenAI et sert un playground local, sans posséder le modèle ni la conversation.
 - `cli` rend chaque concept exécutable depuis Gradle.
 - `tokenizer` et `data` préparent les `IntArray`; `model` les convertira progressivement en calcul neuronal DJL.
 
@@ -71,6 +72,13 @@ flowchart LR
     VALIDATE --> REQUEST
     TOKEN --> JSON[Completion JSON]
     TOKEN --> SSE[Deltas SSE opt-in]
+    DEVICE[RuntimeDeviceResolver<br/>CPU ou CUDA] --> RUNTIME
+    HTTP --> PLAY[Playground statique<br/>tours côté navigateur]
+    PLAY --> FORMAT[ChatPromptFormatter<br/>texte provisoire]
+    FORMAT --> REQUEST
 ```
 
 Le forward, la boucle d'entraînement, les checkpoints, la génération et l'évaluation de corpus existent. PR15 conserve K/V par couche pendant une requête. PR16 charge ce runtime dans un serveur local, refuse les capacités absentes et expose au choix une réponse JSON ou de vrais deltas SSE. La reprise AdamW exacte et une qualité suffisante pour lancer le 17 M restent hors périmètre.
+
+L'extension PR16 sélectionne le device une fois et propage ce choix aux poids, checkpoints, requêtes et diagnostics.
+Le playground sérialise provisoirement ses rôles en texte; il ne transforme pas le modèle base en modèle instruct.

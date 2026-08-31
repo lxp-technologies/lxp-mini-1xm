@@ -5,8 +5,14 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.github.lxptechnologies.lxpmini.cli.CheckpointDemoCommand
 import io.github.lxptechnologies.lxpmini.generation.SamplingOptions
 import io.github.lxptechnologies.lxpmini.generation.SamplingStrategy
+import io.github.lxptechnologies.lxpmini.generation.GenerationResult
 import io.github.lxptechnologies.lxpmini.inference.CompletionRequest
+import io.github.lxptechnologies.lxpmini.inference.CompletionResult
 import io.github.lxptechnologies.lxpmini.inference.ContextOverflowPolicy
+import io.github.lxptechnologies.lxpmini.inference.InferenceConcurrencyPolicy
+import io.github.lxptechnologies.lxpmini.inference.InferenceMetrics
+import io.github.lxptechnologies.lxpmini.inference.InferenceModelKind
+import io.github.lxptechnologies.lxpmini.inference.InferenceModelMetadata
 import io.github.lxptechnologies.lxpmini.inference.InferenceRuntimeLoader
 import io.github.lxptechnologies.lxpmini.tokenizer.ByteTokenizer
 import io.github.lxptechnologies.lxpmini.tokenizer.ByteTokenizerArtifactStore
@@ -54,6 +60,22 @@ class InferenceHttpServerTest {
             assertThat(healthJson["status"].asText()).isEqualTo("ok")
             assertThat(healthJson["model"].asText()).isEqualTo(MODEL_ID)
             assertThat(healthJson["streaming_enabled"].asBoolean()).isTrue()
+            assertThat(healthJson["device"].asText()).isEqualTo(runtime.metadata.selectedDevice)
+            assertThat(healthJson["model_type"].asText()).isEqualTo("base")
+            assertThat(healthJson["context_length"].asInt()).isEqualTo(8)
+
+            val playground = get("$baseUrl/")
+            assertThat(playground.statusCode()).isEqualTo(200)
+            assertThat(playground.headers().firstValue("content-type").orElse("")).startsWith("text/html")
+            assertThat(playground.body()).contains("LXP Mini", "pas encore un chatbot")
+            assertThat(get("$baseUrl/app.css").statusCode()).isEqualTo(200)
+            val javascript = get("$baseUrl/app.js")
+            assertThat(javascript.statusCode()).isEqualTo(200)
+            assertThat(javascript.body()).contains("conversation.splice(0, conversation.length)")
+            assertThat(javascript.body()).doesNotContain("/playground/clear")
+
+            val unknown = get("$baseUrl/this-route-does-not-exist")
+            assertError(unknown, 404, "not_found", null)
 
             val models = mapper.readTree(get("$baseUrl/v1/models").body())
             assertThat(models["object"].asText()).isEqualTo("list")
@@ -137,6 +159,40 @@ class InferenceHttpServerTest {
         assertThat(disabledRuntime.isClosed).isTrue()
     }
 
+    @Test
+    fun `playground formats the conversation before calling inference`() {
+        val inference = RecordingInferenceService()
+        InferenceHttpServer().start(
+            inference,
+            InferenceServerOptions(port = 0),
+        ).use { server ->
+            val response = post(
+                "http://${server.host}:${server.port}/playground/completions",
+                """{
+                    "system_prompt":"Be concise",
+                    "messages":[
+                        {"role":"user","content":"Hello"},
+                        {"role":"assistant","content":"Hi"}
+                    ],
+                    "user_message":"Continue",
+                    "temperature":0,
+                    "max_new_tokens":2,
+                    "top_p":1.0,
+                    "top_k":0
+                }""".trimIndent(),
+            )
+
+            assertThat(response.statusCode()).isEqualTo(200)
+            val json = mapper.readTree(response.body())
+            val expectedPrompt = "System: Be concise\nUser: Hello\nAssistant: Hi\nUser: Continue\nAssistant:"
+            assertThat(json["formatted_prompt"].asText()).isEqualTo(expectedPrompt)
+            assertThat(json["text"].asText()).isEqualTo("reply")
+            assertThat(inference.lastRequest?.prompt).isEqualTo(expectedPrompt)
+            assertThat(inference.lastRequest?.sampling?.strategy).isEqualTo(SamplingStrategy.GREEDY)
+        }
+        assertThat(inference.closed).isTrue()
+    }
+
     private fun createArtifacts(): InferenceArtifacts {
         val runDirectory = temporaryDirectory.resolve("run")
         val tokenizerPath = temporaryDirectory.resolve("tokenizer.json")
@@ -165,12 +221,12 @@ class InferenceHttpServerTest {
         HttpResponse.BodyHandlers.ofString(),
     )
 
-    private fun assertError(response: HttpResponse<String>, status: Int, code: String, param: String) {
+    private fun assertError(response: HttpResponse<String>, status: Int, code: String, param: String?) {
         assertThat(response.statusCode()).isEqualTo(status)
         val error = mapper.readTree(response.body())["error"]
         assertThat(error["type"].asText()).isEqualTo("invalid_request_error")
         assertThat(error["code"].asText()).isEqualTo(code)
-        assertThat(error["param"].asText()).isEqualTo(param)
+        if (param == null) assertThat(error["param"].isNull).isTrue() else assertThat(error["param"].asText()).isEqualTo(param)
         assertThat(error["message"].asText()).isNotBlank()
     }
 
@@ -186,5 +242,55 @@ class InferenceHttpServerTest {
 
     private companion object {
         const val MODEL_ID = "lxp-mini-pr16-test-base"
+    }
+}
+
+private class RecordingInferenceService : LocalInferenceService {
+    override val metadata = InferenceModelMetadata(
+        modelId = "playground-test-base",
+        kind = InferenceModelKind.BASE,
+        checkpointId = "step-1",
+        checkpointSha256 = "0123456789abcdef",
+        vocabularySize = 259,
+        contextLength = 512,
+        parameterCount = 6_752,
+        tokenizerType = "byte",
+        concurrencyPolicy = InferenceConcurrencyPolicy.SERIALIZED,
+        createdAtEpochSeconds = 1,
+        requestedDevice = "cpu",
+        selectedDevice = "cpu",
+        engineName = "PyTorch",
+        nativeRuntimeVersion = "2.7.1",
+        gpuCount = 0,
+    )
+    var lastRequest: CompletionRequest? = null
+    var closed = false
+
+    override fun countPromptTokens(prompt: String): Int = prompt.length
+
+    override fun complete(request: CompletionRequest): CompletionResult {
+        lastRequest = request
+        val generation = GenerationResult(IntArray(request.prompt.length), intArrayOf(1, 2), false, emptyList())
+        return CompletionResult(
+            modelId = metadata.modelId,
+            checkpointId = metadata.checkpointId,
+            prompt = request.prompt,
+            generatedText = "reply",
+            completeText = request.prompt + "reply",
+            promptTokens = request.prompt.length,
+            generatedTokens = 2,
+            stoppedByEos = false,
+            generation = generation,
+            metrics = InferenceMetrics(true, ContextOverflowPolicy.REJECT, 0, 0, 0, 0, 0, 0, 2, 0),
+        )
+    }
+
+    override fun completeStreaming(
+        request: CompletionRequest,
+        onTextDelta: (String) -> Unit,
+    ): CompletionResult = complete(request).also { onTextDelta(it.generatedText) }
+
+    override fun close() {
+        closed = true
     }
 }

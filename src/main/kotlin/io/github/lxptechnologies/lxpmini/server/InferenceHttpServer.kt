@@ -14,7 +14,12 @@ import java.util.concurrent.CountDownLatch
 
 @SpringBootConfiguration(proxyBeanMethods = false)
 @EnableAutoConfiguration
-@Import(OpenAiApiController::class, OpenAiExceptionHandler::class)
+@Import(
+    OpenAiApiController::class,
+    PlaygroundController::class,
+    BaseModelChatPromptFormatter::class,
+    OpenAiExceptionHandler::class,
+)
 internal class InferenceServerApplication
 
 data class InferenceServerOptions(
@@ -69,7 +74,8 @@ class InferenceHttpServer {
         "spring.lifecycle.timeout-per-shutdown-phase" to "5s",
         "spring.main.banner-mode" to "off",
         "spring.jackson.deserialization.fail-on-unknown-properties" to true,
-        "spring.web.resources.add-mappings" to false,
+        "spring.web.resources.add-mappings" to true,
+        "spring.web.resources.static-locations" to "classpath:/web/",
         "spring.mvc.throw-exception-if-no-handler-found" to true,
         "server.error.whitelabel.enabled" to false,
         "logging.level.root" to "WARN",

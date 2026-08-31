@@ -1,10 +1,15 @@
 package io.github.lxptechnologies.lxpmini.config
 
+import io.github.lxptechnologies.lxpmini.runtime.RuntimeDeviceRequest
+
 class ConfigValidator {
     fun validate(config: ProjectConfig): ProjectConfig {
         val errors = buildList {
             validateModel(config.model, this)
             validateTraining(config.training, this)
+            if (config.runtime.device !in RuntimeDeviceRequest.entries.map { request -> request.value }) {
+                add("runtime.device must be one of: auto, cpu, cuda:0")
+            }
         }
 
         if (errors.isNotEmpty()) {

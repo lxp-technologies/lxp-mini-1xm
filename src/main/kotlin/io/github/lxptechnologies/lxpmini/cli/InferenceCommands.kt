@@ -49,6 +49,9 @@ class InferenceCompleteCommand(
     @Option(names = ["--tokenizer"], required = true, paramLabel = "<file>")
     lateinit var tokenizerPath: Path
 
+    @Option(names = ["--device"], description = ["Override runtime.device with auto, cpu, or cuda:0."])
+    var deviceOverride: String? = null
+
     @Option(names = ["--prompt"], required = true, paramLabel = "<text>")
     lateinit var prompt: String
 
@@ -85,12 +88,13 @@ class InferenceCompleteCommand(
     override fun call(): Int = inferenceCli {
         requirePositiveRequests(requests)
         val request = completionRequest()
-        runtimeLoader.load(modelId, runDirectory, tokenizerPath).use { runtime ->
+        runtimeLoader.load(modelId, runDirectory, tokenizerPath, deviceOverride).use { runtime ->
             val before = runtime.diagnostics()
             println("Model ID:             ${runtime.metadata.modelId}")
             println("Model kind:           ${runtime.metadata.kind.name.lowercase(Locale.ROOT)}")
             println("Checkpoint:           ${runtime.metadata.checkpointId}")
             println("Parameters:           ${runtime.metadata.parameterCount}")
+            println("Device:               ${runtime.metadata.selectedDevice}")
             println("Concurrency:          ${runtime.metadata.concurrencyPolicy.name.lowercase(Locale.ROOT)}")
             println("Loaded once:          true")
             repeat(requests) { index ->
@@ -140,6 +144,9 @@ class InferenceBenchmarkCommand(
     @Option(names = ["--tokenizer"], required = true, paramLabel = "<file>")
     lateinit var tokenizerPath: Path
 
+    @Option(names = ["--device"], description = ["Override runtime.device with auto, cpu, or cuda:0."])
+    var deviceOverride: String? = null
+
     @Option(names = ["--prompt"], required = true, paramLabel = "<text>")
     lateinit var prompt: String
 
@@ -166,7 +173,7 @@ class InferenceBenchmarkCommand(
 
         val reloadStarted = System.nanoTime()
         repeat(requests) {
-            runtimeLoader.load(modelId, runDirectory, tokenizerPath).use { runtime ->
+            runtimeLoader.load(modelId, runDirectory, tokenizerPath, deviceOverride).use { runtime ->
                 val generated = runtime.generate(request).generatedTokenIds
                 val expected = reference
                 if (expected == null) reference = generated.copyOf() else outputsIdentical = outputsIdentical && expected.contentEquals(generated)
@@ -176,7 +183,7 @@ class InferenceBenchmarkCommand(
 
         var resourcesStable = false
         val reusedStarted = System.nanoTime()
-        runtimeLoader.load(modelId, runDirectory, tokenizerPath).use { runtime ->
+        runtimeLoader.load(modelId, runDirectory, tokenizerPath, deviceOverride).use { runtime ->
             val before = runtime.diagnostics().managedArrayCount
             repeat(requests) {
                 val generated = runtime.generate(request).generatedTokenIds
@@ -216,6 +223,9 @@ class InferenceCacheBenchmarkCommand(
     @Option(names = ["--tokenizer"], required = true, paramLabel = "<file>")
     lateinit var tokenizerPath: Path
 
+    @Option(names = ["--device"], description = ["Override runtime.device with auto, cpu, or cuda:0."])
+    var deviceOverride: String? = null
+
     @Option(names = ["--prompt"], required = true, paramLabel = "<text>")
     lateinit var prompt: String
 
@@ -234,9 +244,10 @@ class InferenceCacheBenchmarkCommand(
             throw InferenceException("--new-token-counts must contain positive integers")
         }
         val promptTokenIds = tokenizerLoader.load(tokenizerPath).tokenizer.encode(prompt)
-        runtimeLoader.load(modelId, runDirectory, tokenizerPath).use { runtime ->
+        runtimeLoader.load(modelId, runDirectory, tokenizerPath, deviceOverride).use { runtime ->
             println("Model ID:              ${runtime.metadata.modelId}")
             println("Context length:        ${runtime.metadata.contextLength}")
+            println("Device:                ${runtime.metadata.selectedDevice}")
             println("Prompt tokens:         ${promptTokenIds.size}")
             println("Iterations:            $iterations")
             println("newTokens cacheTok/s fullTok/s speedup cacheModelTokens fullModelTokens outputsIdentical")

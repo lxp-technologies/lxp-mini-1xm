@@ -35,6 +35,9 @@ class ServeCommand(
     @Option(names = ["--port"], defaultValue = "8080")
     var port: Int = 8080
 
+    @Option(names = ["--device"], description = ["Override runtime.device with auto, cpu, or cuda:0."])
+    var deviceOverride: String? = null
+
     @Option(
         names = ["--streaming-enabled"],
         negatable = true,
@@ -51,14 +54,20 @@ class ServeCommand(
 
     override fun call(): Int = try {
         validateNetworkOptions()
-        val runtime = runtimeLoader.load(modelId, runDirectory, tokenizerPath)
+        val runtime = runtimeLoader.load(modelId, runDirectory, tokenizerPath, deviceOverride)
         val service = RuntimeInferenceService(runtime)
         httpServer.start(service, InferenceServerOptions(host, port, streamingEnabled)).use { server ->
-            println("Inference server:      http://${server.host}:${server.port}")
-            println("Model:                 ${runtime.metadata.modelId}")
-            println("Checkpoint:            ${runtime.metadata.checkpointId}")
-            println("Streaming enabled:     ${server.streamingEnabled}")
-            println("Concurrency:           ${runtime.metadata.concurrencyPolicy.name.lowercase()}")
+            val displayHost = if (server.host == "127.0.0.1") "localhost" else server.host
+            println("LXP Mini 1xM")
+            println("Server:       http://$displayHost:${server.port}")
+            println("Playground:   http://$displayHost:${server.port}/")
+            println("Model:        ${runtime.metadata.modelId}")
+            println("Parameters:   ${runtime.metadata.parameterCount}")
+            println("Device:       ${runtime.metadata.selectedDevice}")
+            println("Context:      ${runtime.metadata.contextLength}")
+            println("Checkpoint:   ${runtime.metadata.checkpointId}")
+            println("Streaming:    ${server.streamingEnabled}")
+            println("Concurrency:  ${runtime.metadata.concurrencyPolicy.name.lowercase()}")
             println("Press Ctrl+C to stop.")
             server.awaitShutdown()
         }

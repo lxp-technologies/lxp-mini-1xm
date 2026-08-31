@@ -3,7 +3,10 @@ package io.github.lxptechnologies.lxpmini.config
 data class ProjectConfig(
     val model: ModelConfig,
     val training: TrainingConfig,
+    val runtime: RuntimeConfig = RuntimeConfig(),
 )
+
+data class RuntimeConfig(val device: String = "auto")
 
 data class ModelConfig(
     val vocabSize: Int,

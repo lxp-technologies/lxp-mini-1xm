@@ -550,6 +550,10 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 expose le sous-ensemble documenté, refuse les champs sans traduction et permet d'activer ou désactiver le vrai
 streaming SSE au démarrage.
 
+**Extension du 2026-08-31 :** sélection centralisée `auto/cpu/cuda:0`, PyTorch 2.7.1/cu128 vérifié sur Windows,
+diagnostics `runtime info`, propagation du device et playground local statique. Le formateur conversationnel reste
+isolé et le modèle base n'est pas présenté comme instruction-tuned.
+
 **Construire :** serveur Kotlin léger (Ktor à évaluer au début de la PR, mais réelle préférence pour Spring Boot), binding `127.0.0.1` par défaut, `GET /health`, `GET /v1/models`, `GET /v1/models/{model}`, `POST /v1/completions`, erreurs JSON cohérentes et comptage `usage`.
 
 **Compatibilité :** implémenter seulement les champs qui ont une traduction réelle vers le runtime (`model`, `prompt`, limite de génération, température, top-p, seed/stop lorsque supportés). Les champs inconnus ou non supportés ne doivent pas être silencieusement ignorés.

@@ -1,6 +1,5 @@
 package io.github.lxptechnologies.lxpmini.cli
 
-import ai.djl.Device
 import ai.djl.ndarray.NDList
 import ai.djl.ndarray.NDManager
 import ai.djl.ndarray.types.Shape
@@ -19,6 +18,8 @@ import io.github.lxptechnologies.lxpmini.generation.SamplingStrategy
 import io.github.lxptechnologies.lxpmini.generation.TokenSampler
 import io.github.lxptechnologies.lxpmini.model.DecoderLanguageModel
 import io.github.lxptechnologies.lxpmini.model.TensorShapeException
+import io.github.lxptechnologies.lxpmini.runtime.RuntimeDeviceException
+import io.github.lxptechnologies.lxpmini.runtime.RuntimeDeviceResolver
 import io.github.lxptechnologies.lxpmini.tokenizer.SpecialToken
 import io.github.lxptechnologies.lxpmini.tokenizer.Tokenizer
 import io.github.lxptechnologies.lxpmini.tokenizer.TokenizerArtifactLoader
@@ -38,12 +39,16 @@ class GenerateCommand(
     private val configLoader: ConfigLoader = ConfigLoader(),
     private val checkpointStore: CheckpointStore = CheckpointStore(),
     private val tokenizerLoader: TokenizerArtifactLoader = TokenizerArtifactLoader(),
+    private val deviceResolver: RuntimeDeviceResolver = RuntimeDeviceResolver(),
 ) : Callable<Int> {
     @Option(names = ["--run-dir"], required = true, paramLabel = "<directory>")
     lateinit var runDirectory: Path
 
     @Option(names = ["--tokenizer"], required = true, paramLabel = "<file>")
     lateinit var tokenizerPath: Path
+
+    @Option(names = ["--device"], description = ["Override runtime.device with auto, cpu, or cuda:0."])
+    var deviceOverride: String? = null
 
     @Option(names = ["--prompt"], required = true, paramLabel = "<text>")
     lateinit var prompt: String
@@ -90,6 +95,9 @@ class GenerateCommand(
     } catch (exception: TensorShapeException) {
         System.err.println("Tensor shape error: ${exception.message}")
         2
+    } catch (exception: RuntimeDeviceException) {
+        System.err.println("Runtime device error: ${exception.message}")
+        2
     }
 
     private fun generate() {
@@ -102,6 +110,7 @@ class GenerateCommand(
         }
         val configPath = runDirectory.resolve(RunStore.CONFIG_FILE)
         val config = configLoader.load(configPath)
+        val device = deviceResolver.resolve(deviceOverride ?: config.runtime.device)
         val tokenizerArtifact = tokenizerLoader.load(tokenizerPath)
         val tokenizer = tokenizerArtifact.tokenizer
         if (tokenizer.vocabularySize != config.model.vocabSize) {
@@ -113,7 +122,7 @@ class GenerateCommand(
         if (promptTokenIds.isEmpty()) throw GenerationException("Prompt must produce at least one token; use text or --add-bos")
         val options = SamplingOptions(strategy, temperature, topK, topP)
 
-        NDManager.newBaseManager(Device.cpu()).use { manager ->
+        NDManager.newBaseManager(device.selected).use { manager ->
             DecoderLanguageModel(manager, config.model).use { model ->
                 val loaded = checkpointStore.loadLatest(runDirectory, model, manager, Sha256.of(configPath))
                 val parameterStore = ParameterStore(manager, false)
@@ -133,6 +142,7 @@ class GenerateCommand(
                 println("Top-k:              ${if (topK == 0) "disabled" else topK}")
                 println("Top-p:              $topP")
                 println("Seed:               $seed")
+                println("Device:             ${device.selectedName}")
                 println("Context length:     ${config.model.contextLength} (left sliding window)")
                 result.steps.forEach { step -> printStep(step, tokenizer) }
                 println("Generated token IDs:${result.generatedTokenIds.display(prefix = " ")}")

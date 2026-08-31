@@ -49,6 +49,8 @@ Ce dossier accompagne le code dans l'ordre où les concepts sont construits. Ne 
 43. [Serveur OpenAI-compatible et streaming SSE](16-openai-compatible-completions.md)
 44. [ADR : adaptateur strict et SSE opt-in](architecture/decisions/0011-strict-openai-adapter-and-opt-in-sse.md)
 45. [PR16 : servir une completion JSON ou SSE](lab-notes/pr-16-openai-completions.md)
-46. [Plan complet des PR](plan-directeur.md)
+46. [Device runtime et playground local](architecture/runtime-device-and-playground.md)
+47. [ADR : device central et format de chat remplaçable](architecture/decisions/0012-central-runtime-device-and-replaceable-chat-format.md)
+48. [Plan complet des PR](plan-directeur.md)
 
 Les prochains chapitres seront ajoutés avec leur implémentation. Un document ne prétendra jamais qu'un composant fonctionne avant que sa PR fournisse les tests correspondants.

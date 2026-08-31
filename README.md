@@ -12,14 +12,17 @@ $labId = Get-Date -Format yyyyMMdd-HHmmss
 $runDir = "build/labs/pr16/demo-$labId"
 $tokenizerPath = "build/labs/pr16/tokenizer-$labId.json"
 .\gradlew.bat run --args="tokenizer byte create --output $tokenizerPath"
-.\gradlew.bat run --args="train checkpoint-demo --config configs/lab-pr09-tiny.yaml --run-dir $runDir --before-updates 80 --after-updates 1"
-.\gradlew.bat run --args="serve --model-id lxp-mini-pr16-tiny-base --run-dir $runDir --tokenizer $tokenizerPath --port 8080 --streaming-enabled"
+.\gradlew.bat run --args="train checkpoint-demo --config configs/lab-pr15-kv-cache.yaml --run-dir $runDir --before-updates 80 --after-updates 1"
+.\gradlew.bat -PpytorchNative=cpu run --args="serve --model-id lxp-mini-pr16-tiny-base --run-dir $runDir --tokenizer $tokenizerPath --device cpu --port 8080 --streaming-enabled"
 ```
 
-Dans un second PowerShell, une requête garde `stream:false` pour un JSON unique ou utilise `stream:true` pour recevoir
+Ouvre `http://localhost:8080/` pour le playground. Dans un second PowerShell, une requête garde `stream:false` pour un JSON unique ou utilise `stream:true` pour recevoir
 de vrais deltas SSE. Consulte le [chapitre PR16](docs/16-openai-compatible-completions.md) et la
 [note de laboratoire](docs/lab-notes/pr-16-openai-completions.md) pour les commandes complètes. Pour interdire SSE,
 démarre plutôt le serveur avec `--no-streaming-enabled`; les completions non-streamées restent disponibles.
+
+Inspecte les devices avec `.\gradlew.bat run --args="runtime info --device auto"`. Sur Windows NVIDIA,
+`-PpytorchNative=cuda` verrouille PyTorch 2.7.1/cu128 et `--device cuda:0` exige le GPU sans fallback.
 
 ## PR15 - Accélérer le décodage avec un cache KV
 

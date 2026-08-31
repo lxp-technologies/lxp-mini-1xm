@@ -1,6 +1,5 @@
 package io.github.lxptechnologies.lxpmini.inference
 
-import ai.djl.Device
 import ai.djl.ndarray.NDManager
 import ai.djl.training.ParameterStore
 import io.github.lxptechnologies.lxpmini.checkpoint.CheckpointStore
@@ -13,6 +12,8 @@ import io.github.lxptechnologies.lxpmini.generation.GenerationStep
 import io.github.lxptechnologies.lxpmini.generation.SamplingOptions
 import io.github.lxptechnologies.lxpmini.generation.TokenSampler
 import io.github.lxptechnologies.lxpmini.model.DecoderLanguageModel
+import io.github.lxptechnologies.lxpmini.runtime.RuntimeDeviceResolver
+import io.github.lxptechnologies.lxpmini.runtime.RuntimeDeviceSelector
 import io.github.lxptechnologies.lxpmini.tokenizer.SpecialToken
 import io.github.lxptechnologies.lxpmini.tokenizer.Tokenizer
 import io.github.lxptechnologies.lxpmini.tokenizer.TokenizerArtifactLoader
@@ -29,17 +30,28 @@ class InferenceRuntimeLoader(
     private val checkpointStore: CheckpointStore = CheckpointStore(),
     private val runStore: RunStore = RunStore(),
     private val tokenizerLoader: TokenizerArtifactLoader = TokenizerArtifactLoader(),
+    private val deviceResolver: RuntimeDeviceSelector = RuntimeDeviceResolver(),
 ) {
-    fun load(modelId: String, runDirectory: Path, tokenizerPath: Path): InferenceRuntime {
+    fun load(
+        modelId: String,
+        runDirectory: Path,
+        tokenizerPath: Path,
+        deviceOverride: String? = null,
+    ): InferenceRuntime {
         requireModelId(modelId)
-        val rootManager = NDManager.newBaseManager(Device.cpu())
-        val modelManager = rootManager.newSubManager()
+        var rootManager: NDManager? = null
+        var modelManager: NDManager? = null
         var model: DecoderLanguageModel? = null
         try {
-            rootManager.name = "inference-runtime-$modelId"
-            modelManager.name = "inference-model-$modelId"
             val configPath = runDirectory.resolve(RunStore.CONFIG_FILE)
             val config = configLoader.load(configPath)
+            val device = deviceResolver.resolve(deviceOverride ?: config.runtime.device)
+            val root = NDManager.newBaseManager(device.selected)
+            rootManager = root
+            val modelScope = root.newSubManager()
+            modelManager = modelScope
+            root.name = "inference-runtime-$modelId"
+            modelScope.name = "inference-model-$modelId"
             val runMetadata = runStore.loadMetadata(runDirectory)
             val configSha256 = Sha256.of(configPath)
             if (runMetadata.configSha256 != configSha256) {
@@ -66,9 +78,9 @@ class InferenceRuntimeLoader(
                 }
             }
 
-            model = DecoderLanguageModel(modelManager, config.model)
-            val checkpoint = checkpointStore.loadLatest(runDirectory, model, modelManager, configSha256)
-            modelManager.cap()
+            model = DecoderLanguageModel(modelScope, config.model)
+            val checkpoint = checkpointStore.loadLatest(runDirectory, model, modelScope, configSha256)
+            modelScope.cap()
             return InferenceRuntime(
                 metadata = InferenceModelMetadata(
                     modelId = modelId,
@@ -81,10 +93,15 @@ class InferenceRuntimeLoader(
                     tokenizerType = tokenizerArtifact.type,
                     concurrencyPolicy = InferenceConcurrencyPolicy.SERIALIZED,
                     createdAtEpochSeconds = Instant.parse(runMetadata.createdAtUtc).epochSecond,
+                    requestedDevice = device.requested.value,
+                    selectedDevice = device.selectedName,
+                    engineName = device.engineName,
+                    nativeRuntimeVersion = device.nativeRuntimeVersion,
+                    gpuCount = device.gpuCount,
                 ),
                 tokenizer = tokenizerArtifact.tokenizer,
-                rootManager = rootManager,
-                modelManager = modelManager,
+                rootManager = root,
+                modelManager = modelScope,
                 model = model,
             )
         } catch (throwable: Throwable) {
@@ -106,8 +123,8 @@ class InferenceRuntimeLoader(
     private fun closeAfterFailedLoad(
         failure: Throwable,
         model: DecoderLanguageModel?,
-        modelManager: NDManager,
-        rootManager: NDManager,
+        modelManager: NDManager?,
+        rootManager: NDManager?,
     ) {
         listOfNotNull<AutoCloseable>(model, modelManager, rootManager).forEach { resource ->
             try {
@@ -340,6 +357,11 @@ data class InferenceModelMetadata(
     val tokenizerType: String,
     val concurrencyPolicy: InferenceConcurrencyPolicy,
     val createdAtEpochSeconds: Long,
+    val requestedDevice: String,
+    val selectedDevice: String,
+    val engineName: String,
+    val nativeRuntimeVersion: String,
+    val gpuCount: Int,
 )
 
 data class TokenGenerationRequest(

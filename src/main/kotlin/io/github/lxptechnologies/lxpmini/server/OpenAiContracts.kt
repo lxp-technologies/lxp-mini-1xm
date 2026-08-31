@@ -8,6 +8,10 @@ data class HealthResponse(
     val model: String,
     val checkpoint: String,
     @JsonProperty("streaming_enabled") val streamingEnabled: Boolean,
+    val parameters: Long,
+    val device: String,
+    @JsonProperty("model_type") val modelType: String,
+    @JsonProperty("context_length") val contextLength: Int,
 )
 
 data class ModelListResponse(

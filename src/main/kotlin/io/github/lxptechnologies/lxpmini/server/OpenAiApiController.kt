@@ -34,6 +34,10 @@ class OpenAiApiController(
         model = inference.metadata.modelId,
         checkpoint = inference.metadata.checkpointId,
         streamingEnabled = capabilities.streamingEnabled,
+        parameters = inference.metadata.parameterCount,
+        device = inference.metadata.selectedDevice,
+        modelType = inference.metadata.kind.name.lowercase(),
+        contextLength = inference.metadata.contextLength,
     )
 
     @GetMapping("/v1/models")

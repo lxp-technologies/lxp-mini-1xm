@@ -16,6 +16,9 @@ import io.github.lxptechnologies.lxpmini.generation.SamplingOptions
 import io.github.lxptechnologies.lxpmini.generation.SamplingStrategy
 import io.github.lxptechnologies.lxpmini.generation.TokenSampler
 import io.github.lxptechnologies.lxpmini.model.DecoderLanguageModel
+import io.github.lxptechnologies.lxpmini.runtime.RuntimeDeviceRequest
+import io.github.lxptechnologies.lxpmini.runtime.RuntimeDeviceSelection
+import io.github.lxptechnologies.lxpmini.runtime.RuntimeDeviceSelector
 import io.github.lxptechnologies.lxpmini.tokenizer.ByteTokenizer
 import io.github.lxptechnologies.lxpmini.tokenizer.ByteTokenizerArtifactStore
 import io.github.lxptechnologies.lxpmini.tokenizer.SpecialToken
@@ -89,6 +92,34 @@ class InferenceRuntimeTest {
             InferenceRuntimeLoader().load("LXP Mini/latest", artifacts.runDirectory, artifacts.tokenizerPath)
         }.isInstanceOf(InferenceException::class.java)
             .hasMessageContaining("modelId must match")
+    }
+
+    @Test
+    fun `loader resolves the CLI override once and propagates the selected device`() {
+        val artifacts = createArtifacts()
+        val requestedValues = mutableListOf<String>()
+        val selector = RuntimeDeviceSelector { requested ->
+            requestedValues += requested
+            RuntimeDeviceSelection(
+                requested = RuntimeDeviceRequest.CPU,
+                selected = Device.cpu(),
+                selectedName = "cpu",
+                engineName = "PyTorch",
+                djlVersion = "0.36.0",
+                nativeRuntimeVersion = "2.7.1",
+                gpuCount = 1,
+            )
+        }
+
+        InferenceRuntimeLoader(deviceResolver = selector)
+            .load(MODEL_ID, artifacts.runDirectory, artifacts.tokenizerPath, deviceOverride = "cpu")
+            .use { runtime ->
+                assertThat(requestedValues).containsExactly("cpu")
+                assertThat(runtime.metadata.requestedDevice).isEqualTo("cpu")
+                assertThat(runtime.metadata.selectedDevice).isEqualTo("cpu")
+                assertThat(runtime.metadata.engineName).isEqualTo("PyTorch")
+                assertThat(runtime.metadata.nativeRuntimeVersion).isEqualTo("2.7.1")
+            }
     }
 
     @Test

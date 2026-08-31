@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LXP Mini 1xM Playground</title>
+    <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+<main class="shell">
+    <header class="masthead">
+        <div>
+            <p class="eyebrow">LOCAL LANGUAGE LAB</p>
+            <h1>LXP Mini <span>1xM</span></h1>
+            <p class="lede">Observe un petit modèle base compléter le texte que nous construisons.</p>
+        </div>
+        <dl class="runtime-card" aria-label="Runtime chargé">
+            <div><dt>Modèle</dt><dd id="model-name">chargement...</dd></div>
+            <div><dt>Device</dt><dd id="runtime-device">-</dd></div>
+            <div><dt>Type</dt><dd id="model-type">-</dd></div>
+            <div><dt>Contexte</dt><dd id="context-length">-</dd></div>
+        </dl>
+    </header>
+
+    <aside class="base-warning">
+        <strong>Expérience de formatage, pas encore un chatbot.</strong>
+        Les rôles et le « system prompt » deviennent du texte ordinaire. Le modèle base n’a pas encore appris leur
+        hiérarchie; Chat Template et SFT arriveront dans une PR ultérieure.
+    </aside>
+
+    <section class="workspace">
+        <div class="conversation-panel">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">TRANSCRIPTION</p>
+                    <h2>Conversation expérimentale</h2>
+                </div>
+                <button id="clear-button" class="quiet-button" type="button">Effacer localement</button>
+            </div>
+            <div id="transcript" class="transcript" aria-live="polite">
+                <p class="empty-state">Écris un message pour observer une continuation.</p>
+            </div>
+            <form id="prompt-form">
+                <label for="user-message">Ton texte</label>
+                <div class="composer">
+                    <textarea id="user-message" rows="3" required placeholder="Ex. Continue cette petite histoire..."></textarea>
+                    <button id="send-button" class="send-button" type="submit">Envoyer</button>
+                </div>
+                <p id="generation-state" class="generation-state" role="status">Prêt.</p>
+            </form>
+        </div>
+
+        <aside class="controls-panel">
+            <p class="eyebrow">CONTRÔLES</p>
+            <h2>Contexte et sampling</h2>
+            <label for="system-prompt">Préfixe « system » expérimental</label>
+            <textarea id="system-prompt" rows="5">Tu es un assistant concis.</textarea>
+
+            <div class="control-grid">
+                <label>Température
+                    <input id="temperature" type="number" min="0" max="2" step="0.1" value="0.8">
+                </label>
+                <label>Nouveaux tokens
+                    <input id="max-new-tokens" type="number" min="1" value="32">
+                </label>
+                <label>Top-p
+                    <input id="top-p" type="number" min="0.01" max="1" step="0.05" value="0.95">
+                </label>
+                <label>Top-k
+                    <input id="top-k" type="number" min="0" step="1" value="0">
+                </label>
+            </div>
+            <p class="control-note">Top-k à 0 signifie désactivé. La conversation vit uniquement dans cet onglet.</p>
+        </aside>
+    </section>
+</main>
+<script src="/app.js" defer></script>
+</body>
+</html>
