@@ -87,6 +87,26 @@ class TransformerBlock(
         )
     }
 
+    internal fun forwardIncremental(
+        parameterStore: ParameterStore,
+        input: NDArray,
+        cache: AttentionKeyValueCache,
+    ): NDArray {
+        requireInputShape(input.shape)
+        val normalizedAttentionInput = attentionNorm
+            .forward(parameterStore, NDList(input), false)
+            .singletonOrThrow()
+        val attentionOutput = attention.forwardIncremental(parameterStore, normalizedAttentionInput, cache).output
+        val afterAttention = input.add(attentionOutput)
+        val normalizedFeedForwardInput = feedForwardNorm
+            .forward(parameterStore, NDList(afterAttention), false)
+            .singletonOrThrow()
+        val feedForwardOutput = feedForward
+            .forward(parameterStore, NDList(normalizedFeedForwardInput), false)
+            .singletonOrThrow()
+        return afterAttention.add(feedForwardOutput)
+    }
+
     override fun getOutputShapes(inputShapes: Array<Shape>): Array<Shape> {
         if (inputShapes.size != 1) throw TensorShapeException("TransformerBlock expects exactly one input shape")
         requireInputShape(inputShapes[0])

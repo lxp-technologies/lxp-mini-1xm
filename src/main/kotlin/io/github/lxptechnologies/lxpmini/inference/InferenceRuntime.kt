@@ -1,9 +1,7 @@
 package io.github.lxptechnologies.lxpmini.inference
 
 import ai.djl.Device
-import ai.djl.ndarray.NDList
 import ai.djl.ndarray.NDManager
-import ai.djl.ndarray.types.Shape
 import ai.djl.training.ParameterStore
 import io.github.lxptechnologies.lxpmini.checkpoint.CheckpointStore
 import io.github.lxptechnologies.lxpmini.checkpoint.RunStore
@@ -137,24 +135,36 @@ class InferenceRuntime internal constructor(
     val isClosed: Boolean
         get() = closed.get()
 
-    fun generate(request: TokenGenerationRequest): GenerationResult = lifecycleLock.withLock {
+    fun generate(request: TokenGenerationRequest): GenerationResult = generateWithMetrics(request).generation
+
+    fun generateWithMetrics(request: TokenGenerationRequest): InferenceGenerationResult = lifecycleLock.withLock {
         requireOpen()
+        validateContextBudget(request)
         val requestNumber = completedRequests.get() + 1
         rootManager.newSubManager().use { requestManager ->
             requestManager.name = "inference-request-$requestNumber"
-            val generator = AutoregressiveGenerator(
-                metadata.contextLength,
-                metadata.vocabularySize,
-                TokenSampler(request.seed),
-            ) { context -> lastTokenLogits(requestManager, context) }
-            val result = generator.generate(
-                request.promptTokenIds,
-                request.maxNewTokens,
-                request.eosTokenId,
-                request.sampling,
-            )
-            completedRequests.incrementAndGet()
-            result
+            newLogitsSession(request, requestManager).use { session ->
+                val generator = AutoregressiveGenerator(
+                    metadata.contextLength,
+                    metadata.vocabularySize,
+                    TokenSampler(request.seed),
+                    session::lastTokenLogits,
+                )
+                val result = generator.generate(
+                    request.promptTokenIds,
+                    request.maxNewTokens,
+                    request.eosTokenId,
+                    request.sampling,
+                )
+                completedRequests.incrementAndGet()
+                InferenceGenerationResult(
+                    result,
+                    session.metrics(
+                        result.generatedTokenIds.size,
+                        (request.promptTokenIds.size - metadata.contextLength).coerceAtLeast(0),
+                    ),
+                )
+            }
         }
     }
 
@@ -163,14 +173,17 @@ class InferenceRuntime internal constructor(
         if (promptTokenIds.isEmpty()) {
             throw InferenceException("Prompt must produce at least one token; provide text or enable addBos")
         }
-        val generation = generate(
+        val detailedGeneration = generateWithMetrics(
             TokenGenerationRequest(
                 promptTokenIds = promptTokenIds,
                 maxNewTokens = request.maxNewTokens,
                 sampling = request.sampling,
                 seed = request.seed,
+                cacheEnabled = request.cacheEnabled,
+                contextPolicy = request.contextPolicy,
             ),
         )
+        val generation = detailedGeneration.generation
         return try {
             CompletionResult(
                 modelId = metadata.modelId,
@@ -182,6 +195,7 @@ class InferenceRuntime internal constructor(
                 generatedTokens = generation.generatedTokenIds.size,
                 stoppedByEos = generation.stoppedByEos,
                 generation = generation,
+                metrics = detailedGeneration.metrics,
             )
         } catch (exception: TokenizerException) {
             throw InferenceException(
@@ -223,12 +237,23 @@ class InferenceRuntime internal constructor(
         }
     }
 
-    private fun lastTokenLogits(requestManager: NDManager, context: IntArray): FloatArray =
-        requestManager.newSubManager().use { tokenManager ->
-            val input = tokenManager.create(context.map(Int::toLong).toLongArray(), Shape(1, context.size.toLong()))
-            val logits = model.forward(parameterStore, NDList(input), false).singletonOrThrow()
-            logits.get("0, ${context.lastIndex}, :").toFloatArray()
+    private fun newLogitsSession(request: TokenGenerationRequest, requestManager: NDManager): InferenceLogitsSession =
+        if (request.cacheEnabled) {
+            KeyValueLogitsSession(requestManager, model, parameterStore, request.contextPolicy)
+        } else {
+            FullRecomputeLogitsSession(requestManager, model, parameterStore, request.contextPolicy)
         }
+
+    private fun validateContextBudget(request: TokenGenerationRequest) {
+        if (request.contextPolicy == ContextOverflowPolicy.REJECT &&
+            request.promptTokenIds.size.toLong() + request.maxNewTokens > metadata.contextLength
+        ) {
+            throw InferenceException(
+                "Prompt (${request.promptTokenIds.size}) plus maxNewTokens (${request.maxNewTokens}) " +
+                    "exceeds context ${metadata.contextLength} with REJECT policy",
+            )
+        }
+    }
 
     private fun requireOpen() {
         if (closed.get()) throw InferenceException("Inference runtime '${metadata.modelId}' is closed")
@@ -261,6 +286,8 @@ data class TokenGenerationRequest(
     val sampling: SamplingOptions = SamplingOptions(),
     val seed: Long = 42,
     val eosTokenId: Int = SpecialToken.EOS.id,
+    val cacheEnabled: Boolean = true,
+    val contextPolicy: ContextOverflowPolicy = ContextOverflowPolicy.SLIDING_WINDOW,
 )
 
 data class CompletionRequest(
@@ -269,6 +296,8 @@ data class CompletionRequest(
     val sampling: SamplingOptions = SamplingOptions(),
     val seed: Long = 42,
     val addBos: Boolean = false,
+    val cacheEnabled: Boolean = true,
+    val contextPolicy: ContextOverflowPolicy = ContextOverflowPolicy.SLIDING_WINDOW,
 )
 
 data class CompletionResult(
@@ -281,8 +310,37 @@ data class CompletionResult(
     val generatedTokens: Int,
     val stoppedByEos: Boolean,
     val generation: GenerationResult,
+    val metrics: InferenceMetrics,
 ) {
     val totalTokens: Int = promptTokens + generatedTokens
+}
+
+data class InferenceGenerationResult(
+    val generation: GenerationResult,
+    val metrics: InferenceMetrics,
+)
+
+enum class ContextOverflowPolicy {
+    REJECT,
+    SLIDING_WINDOW,
+}
+
+data class InferenceMetrics(
+    val cacheEnabled: Boolean,
+    val contextPolicy: ContextOverflowPolicy,
+    val prefillTokensProcessed: Long,
+    val decodeTokensProcessed: Long,
+    val prefillNanos: Long,
+    val decodeNanos: Long,
+    val cacheInvalidations: Int,
+    val peakCachedTokens: Int,
+    val generatedTokenCount: Int,
+    val promptTokensDiscarded: Int,
+) {
+    val totalModelNanos: Long = prefillNanos + decodeNanos
+    val modelTokensProcessed: Long = prefillTokensProcessed + decodeTokensProcessed
+    val generatedTokensPerSecond: Double =
+        if (totalModelNanos == 0L) 0.0 else generatedTokenCount * 1_000_000_000.0 / totalModelNanos
 }
 
 data class InferenceRuntimeDiagnostics(

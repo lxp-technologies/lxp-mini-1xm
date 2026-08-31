@@ -1,6 +1,6 @@
 # Plan directeur de `lxp-mini-1xm`
 
-> Statut : PR01 à PR14 terminées; runtime d'inférence réutilisable validé; PR15 cible le cache KV et la gestion du contexte
+> Statut : PR01 à PR15 terminées; cache KV isolé et politiques de contexte validés; PR16 cible le serveur HTTP de completions
 > Source de vérité initiale : [`docs2/project.md`](../docs2/project.md)  
 > Dernière mise à jour : 2026-08-30
 
@@ -533,6 +533,8 @@ Chaque ligne importante devra devenir un ADR court dans `docs/architecture/decis
 **Critère de sortie :** aucune connaissance HTTP dans `model/`, `generation/` ou le coeur du runtime.
 
 #### PR15 - KV cache et gestion du contexte
+
+**Statut :** implémentée le 2026-08-30 sur `feature/pr15-kv-cache-context`. Les logits cached sont équivalents au forward complet à `1e-5`; les caches sont isolés par requête et l'expérience 32/64/128 mesure le coût fixe puis le gain.
 
 **Construire :** cache K/V par couche pour le décodage autoregressif, invalidation et lifecycle; politique de dépassement de contexte; métriques prefill vs decode.
 

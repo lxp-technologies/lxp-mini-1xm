@@ -68,6 +68,35 @@ class DecoderLanguageModel(
         return DecoderLanguageModelResult(logits, embedded, blockOutputs, normalized)
     }
 
+    fun newKeyValueCache(parentManager: NDManager): DecoderKeyValueCache = DecoderKeyValueCache(
+        parentManager = parentManager,
+        layerCount = config.numLayers,
+        headCount = config.numHeads,
+        headDimension = config.headDim,
+        maximumSequenceLength = config.contextLength,
+    )
+
+    fun forwardIncremental(
+        parameterStore: ParameterStore,
+        tokenIds: NDArray,
+        cache: DecoderKeyValueCache,
+    ): NDArray {
+        requireTokenShape(tokenIds.shape)
+        requireCompatibleCache(cache, tokenIds.shape[1].toInt())
+        var hiddenState = embedding.forward(parameterStore, NDList(tokenIds), false).singletonOrThrow()
+        for (index in transformerBlocks.indices) {
+            hiddenState = transformerBlocks[index].forwardIncremental(
+                parameterStore,
+                hiddenState,
+                cache.layers[index],
+            )
+        }
+        val normalized = finalNorm.forward(parameterStore, NDList(hiddenState), false).singletonOrThrow()
+        val logits = languageModelHead.forward(parameterStore, NDList(normalized), false).singletonOrThrow()
+        cache.advance(tokenIds.shape[1].toInt())
+        return logits
+    }
+
     override fun getOutputShapes(inputShapes: Array<Shape>): Array<Shape> {
         if (inputShapes.size != 1) throw TensorShapeException("DecoderLanguageModel expects exactly one input shape")
         requireTokenShape(inputShapes[0])
@@ -127,6 +156,23 @@ class DecoderLanguageModel(
         }
         if (shape[1] > config.contextLength) {
             throw TensorShapeException("Sequence length ${shape[1]} exceeds context ${config.contextLength}")
+        }
+    }
+
+    private fun requireCompatibleCache(cache: DecoderKeyValueCache, newTokenCount: Int) {
+        if (!cache.isOpen) throw TensorShapeException("KV cache is closed")
+        if (cache.layerCount != config.numLayers || cache.headCount != config.numHeads ||
+            cache.headDimension != config.headDim || cache.maximumSequenceLength != config.contextLength
+        ) {
+            throw TensorShapeException("KV cache architecture does not match the decoder")
+        }
+        if (cache.tokenCount + newTokenCount > config.contextLength) {
+            throw TensorShapeException(
+                "KV cache length ${cache.tokenCount + newTokenCount} exceeds context ${config.contextLength}",
+            )
+        }
+        if (cache.layers.any { layer -> layer.tokenCount != cache.tokenCount }) {
+            throw TensorShapeException("KV cache layers are not synchronized")
         }
     }
 

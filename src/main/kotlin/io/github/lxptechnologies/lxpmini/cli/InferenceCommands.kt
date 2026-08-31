@@ -4,6 +4,7 @@ import io.github.lxptechnologies.lxpmini.generation.GenerationException
 import io.github.lxptechnologies.lxpmini.generation.SamplingOptions
 import io.github.lxptechnologies.lxpmini.generation.SamplingStrategy
 import io.github.lxptechnologies.lxpmini.inference.CompletionRequest
+import io.github.lxptechnologies.lxpmini.inference.ContextOverflowPolicy
 import io.github.lxptechnologies.lxpmini.inference.InferenceException
 import io.github.lxptechnologies.lxpmini.inference.InferenceRuntimeLoader
 import io.github.lxptechnologies.lxpmini.inference.TokenGenerationRequest
@@ -19,7 +20,11 @@ import kotlin.math.max
 @Command(
     name = "inference",
     description = ["Serve repeated local inference requests from one loaded base model."],
-    subcommands = [InferenceCompleteCommand::class, InferenceBenchmarkCommand::class],
+    subcommands = [
+        InferenceCompleteCommand::class,
+        InferenceBenchmarkCommand::class,
+        InferenceCacheBenchmarkCommand::class,
+    ],
 )
 class InferenceCommand : Runnable {
     override fun run() {
@@ -71,6 +76,12 @@ class InferenceCompleteCommand(
     @Option(names = ["--add-bos"])
     var addBos: Boolean = false
 
+    @Option(names = ["--kv-cache"], negatable = true, defaultValue = "true")
+    var cacheEnabled: Boolean = true
+
+    @Option(names = ["--context-policy"], defaultValue = "sliding-window", description = ["sliding-window or reject"])
+    lateinit var contextPolicyName: String
+
     override fun call(): Int = inferenceCli {
         requirePositiveRequests(requests)
         val request = completionRequest()
@@ -86,6 +97,12 @@ class InferenceCompleteCommand(
                 val result = runtime.complete(request)
                 println("Request ${index + 1}:            ${result.generatedText.quoted()}")
                 println("Generated tokens:     ${result.generatedTokens}")
+                println("KV cache:             ${result.metrics.cacheEnabled}")
+                println("Prefill tokens:       ${result.metrics.prefillTokensProcessed}")
+                println("Decode tokens:        ${result.metrics.decodeTokensProcessed}")
+                println("Prompt tokens dropped:${result.metrics.promptTokensDiscarded.toString().padStart(2)}")
+                println("Cache invalidations:  ${result.metrics.cacheInvalidations}")
+                println("Model tokens/s:       ${result.metrics.generatedTokensPerSecond.rate()}")
             }
             val after = runtime.diagnostics()
             println("Completed requests:   ${after.completedRequests}")
@@ -100,6 +117,8 @@ class InferenceCompleteCommand(
         sampling = samplingOptions(strategyName, temperature, topK, topP),
         seed = seed,
         addBos = addBos,
+        cacheEnabled = cacheEnabled,
+        contextPolicy = contextPolicy(contextPolicyName),
     )
 }
 
@@ -140,6 +159,7 @@ class InferenceBenchmarkCommand(
             maxNewTokens = maxNewTokens,
             sampling = SamplingOptions(strategy = SamplingStrategy.GREEDY),
             seed = seed,
+            cacheEnabled = false,
         )
         var reference: IntArray? = null
         var outputsIdentical = true
@@ -178,6 +198,107 @@ class InferenceBenchmarkCommand(
     }
 }
 
+@Command(
+    name = "cache-benchmark",
+    mixinStandardHelpOptions = true,
+    description = ["Compare cached decoding with full recomputation for several generation lengths."],
+)
+class InferenceCacheBenchmarkCommand(
+    private val runtimeLoader: InferenceRuntimeLoader = InferenceRuntimeLoader(),
+    private val tokenizerLoader: TokenizerArtifactLoader = TokenizerArtifactLoader(),
+) : Callable<Int> {
+    @Option(names = ["--model-id"], defaultValue = DEFAULT_MODEL_ID)
+    lateinit var modelId: String
+
+    @Option(names = ["--run-dir"], required = true, paramLabel = "<directory>")
+    lateinit var runDirectory: Path
+
+    @Option(names = ["--tokenizer"], required = true, paramLabel = "<file>")
+    lateinit var tokenizerPath: Path
+
+    @Option(names = ["--prompt"], required = true, paramLabel = "<text>")
+    lateinit var prompt: String
+
+    @Option(names = ["--new-token-counts"], split = ",", defaultValue = "32,64,128")
+    lateinit var newTokenCounts: IntArray
+
+    @Option(names = ["--iterations"], defaultValue = "3")
+    var iterations: Int = 3
+
+    @Option(names = ["--seed"], defaultValue = "42")
+    var seed: Long = 42
+
+    override fun call(): Int = inferenceCli {
+        requirePositiveRequests(iterations)
+        if (newTokenCounts.isEmpty() || newTokenCounts.any { count -> count <= 0 }) {
+            throw InferenceException("--new-token-counts must contain positive integers")
+        }
+        val promptTokenIds = tokenizerLoader.load(tokenizerPath).tokenizer.encode(prompt)
+        runtimeLoader.load(modelId, runDirectory, tokenizerPath).use { runtime ->
+            println("Model ID:              ${runtime.metadata.modelId}")
+            println("Context length:        ${runtime.metadata.contextLength}")
+            println("Prompt tokens:         ${promptTokenIds.size}")
+            println("Iterations:            $iterations")
+            println("newTokens cacheTok/s fullTok/s speedup cacheModelTokens fullModelTokens outputsIdentical")
+            newTokenCounts.forEach { newTokenCount ->
+                val cached = measure(runtime, promptTokenIds, newTokenCount, cacheEnabled = true)
+                val full = measure(runtime, promptTokenIds, newTokenCount, cacheEnabled = false)
+                val outputsIdentical = cached.generatedTokenIds.contentEquals(full.generatedTokenIds)
+                println(
+                    "%9d %10s %9s %7sx %16d %15d %s".format(
+                        Locale.ROOT,
+                        newTokenCount,
+                        cached.tokensPerSecond.rate(),
+                        full.tokensPerSecond.rate(),
+                        cached.tokensPerSecond.div(maxOf(full.tokensPerSecond, Double.MIN_VALUE)).ratio(),
+                        cached.modelTokensProcessed,
+                        full.modelTokensProcessed,
+                        outputsIdentical,
+                    ),
+                )
+            }
+        }
+        println("Runtime closed:        true")
+    }
+
+    private fun measure(
+        runtime: io.github.lxptechnologies.lxpmini.inference.InferenceRuntime,
+        promptTokenIds: IntArray,
+        newTokenCount: Int,
+        cacheEnabled: Boolean,
+    ): CacheBenchmarkMeasurement {
+        val request = TokenGenerationRequest(
+            promptTokenIds = promptTokenIds,
+            maxNewTokens = newTokenCount,
+            sampling = SamplingOptions(strategy = SamplingStrategy.GREEDY),
+            seed = seed,
+            cacheEnabled = cacheEnabled,
+            contextPolicy = ContextOverflowPolicy.REJECT,
+        )
+        runtime.generateWithMetrics(request)
+        var totalNanos = 0L
+        var modelTokensProcessed = 0L
+        var generatedTokenIds = IntArray(0)
+        var generatedTokenCount = 0
+        repeat(iterations) {
+            val result = runtime.generateWithMetrics(request)
+            totalNanos += result.metrics.totalModelNanos
+            modelTokensProcessed = result.metrics.modelTokensProcessed
+            generatedTokenIds = result.generation.generatedTokenIds
+            generatedTokenCount = result.generation.generatedTokenIds.size
+        }
+        val averageNanos = totalNanos.toDouble() / iterations
+        val tokensPerSecond = if (averageNanos == 0.0) 0.0 else generatedTokenCount * 1_000_000_000.0 / averageNanos
+        return CacheBenchmarkMeasurement(tokensPerSecond, modelTokensProcessed, generatedTokenIds)
+    }
+}
+
+private data class CacheBenchmarkMeasurement(
+    val tokensPerSecond: Double,
+    val modelTokensProcessed: Long,
+    val generatedTokenIds: IntArray,
+)
+
 private const val DEFAULT_MODEL_ID = "lxp-mini-1xm-base"
 
 private fun inferenceCli(action: () -> Unit): Int = try {
@@ -212,6 +333,12 @@ private fun samplingOptions(
     return SamplingOptions(strategy, temperature, topK, topP)
 }
 
+private fun contextPolicy(name: String): ContextOverflowPolicy = when (name.lowercase(Locale.ROOT)) {
+    "reject" -> ContextOverflowPolicy.REJECT
+    "sliding-window" -> ContextOverflowPolicy.SLIDING_WINDOW
+    else -> throw InferenceException("--context-policy must be 'sliding-window' or 'reject'")
+}
+
 private fun String.quoted(): String = buildString {
     append('"')
     for (character in this@quoted) {
@@ -229,3 +356,5 @@ private fun String.quoted(): String = buildString {
 
 private fun Boolean.yesNo(prefix: String = ""): String = prefix + if (this) "true" else "false"
 private fun Long.milliseconds(): String = "%.2f".format(Locale.ROOT, this / 1_000_000.0)
+private fun Double.rate(): String = "%.2f".format(Locale.ROOT, this)
+private fun Double.ratio(): String = "%.2f".format(Locale.ROOT, this)

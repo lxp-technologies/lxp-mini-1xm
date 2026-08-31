@@ -63,6 +63,9 @@ class InferenceCommandsTest {
             "Concurrency:          serialized",
             "Loaded once:          true",
             "Request 3:",
+            "KV cache:             true",
+            "Prefill tokens:       3",
+            "Cache invalidations:  0",
             "Completed requests:   3",
             "Managed arrays stable: true",
             "Runtime closed:       true",
@@ -96,6 +99,34 @@ class InferenceCommandsTest {
             "Outputs identical:         true",
             "Managed arrays stable:     true",
             "Runtime closed:            true",
+        )
+    }
+
+    @Test
+    fun `cache benchmark compares incremental and full decoding`() {
+        val captured = captureStandardOutput {
+            CommandLine(LxpMiniCommand()).execute(
+                "inference",
+                "cache-benchmark",
+                "--run-dir",
+                runDirectory.toString(),
+                "--tokenizer",
+                tokenizerPath.toString(),
+                "--prompt",
+                "abc",
+                "--new-token-counts",
+                "2,3",
+                "--iterations",
+                "1",
+            )
+        }
+
+        assertThat(captured.exitCode).isZero()
+        assertThat(captured.text).contains(
+            "Context length:        8",
+            "newTokens cacheTok/s fullTok/s speedup cacheModelTokens fullModelTokens outputsIdentical",
+            "true",
+            "Runtime closed:        true",
         )
     }
 
