@@ -48,7 +48,7 @@ class OpenAiApiController(
     @PostMapping("/v1/completions", consumes = [MediaType.APPLICATION_JSON_VALUE])
     fun complete(@RequestBody request: CompletionCreateRequest): ResponseEntity<StreamingResponseBody> {
         val validated = validate(request)
-        val completionId = "cmpl-${UUID.randomUUID().toString().replace("-", "")}" 
+        val completionId = "cmpl-${UUID.randomUUID().toString().replace("-", "")}"
         val created = Instant.now().epochSecond
         return if (request.stream) {
             streamingResponse(validated, completionId, created)
