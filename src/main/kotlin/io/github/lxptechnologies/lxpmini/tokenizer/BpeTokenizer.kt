@@ -43,6 +43,10 @@ class BpeTokenizer(
         return Utf8Codec.decode(decodeToBytes(tokenIds, skipSpecialTokens))
     }
 
+    override fun decodeLossy(tokenIds: IntArray, skipSpecialTokens: Boolean): String {
+        return Utf8Codec.decodeLossy(decodeToBytes(tokenIds, skipSpecialTokens))
+    }
+
     fun decodeToBytes(tokenIds: IntArray, skipSpecialTokens: Boolean = true): ByteArray {
         val output = ByteArrayOutputStream()
         tokenIds.forEach { tokenId ->

@@ -155,3 +155,18 @@ Le smoke test réel a chargé le modèle CPU à contexte 256, servi `/` et `/app
 `System: Be concise.\nUser: abc\nAssistant:` en 40 tokens. Sa continuation greedy de huit tokens était `EEEEEEEE` :
 le transport et le formatage fonctionnent, mais la sortie illustre précisément pourquoi ce checkpoint base n'est pas
 encore un chatbot.
+
+## Expérience D - Reproduire une sortie UTF-8 invalide
+
+Le tiny modèle peut choisir des byte tokens qui ne forment pas du UTF-8 valide. Avant le correctif PR16, le playground
+retournait alors une erreur 500 contenant `Generated token IDs do not form valid text`. Ce test reprend la séquence
+observée et vérifie le décodage non-streaming ainsi que le flush final du streaming :
+
+```powershell
+.\gradlew.bat test --tests "io.github.lxptechnologies.lxpmini.tokenizer.ByteTokenizerTest" --tests "io.github.lxptechnologies.lxpmini.inference.IncrementalTextDecoderTest"
+```
+
+Résultat attendu : `BUILD SUCCESSFUL`. `decode()` continue de rejeter une séquence invalide, tandis que
+`decodeLossy()` la rend affichable avec `�`. Pour vérifier manuellement dans le playground, arrêter l'ancien serveur
+avec `Ctrl+C`, relancer la même commande `serve`, puis générer avec le même prompt et la même seed. La réponse peut
+contenir `�`, ce qui décrit fidèlement les bytes encore mal appris, mais elle ne doit plus produire une erreur 500.

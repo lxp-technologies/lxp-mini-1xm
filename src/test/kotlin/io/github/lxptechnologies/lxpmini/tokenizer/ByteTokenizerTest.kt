@@ -96,6 +96,17 @@ class ByteTokenizerTest {
     }
 
     @Test
+    fun `lossy decoding replaces invalid UTF-8 for generated text`() {
+        val invalidSequence = intArrayOf(0xF0, 0x28, 0x8C, 0x28)
+            .map(tokenizer::tokenIdForByte)
+            .toIntArray()
+
+        assertThat(tokenizer.decodeLossy(invalidSequence)).isEqualTo("�(�(")
+        assertThatThrownBy { tokenizer.decode(invalidSequence) }
+            .isInstanceOf(TokenizerException::class.java)
+    }
+
+    @Test
     fun `requires explicit skipping when special tokens are present`() {
         assertThatThrownBy {
             tokenizer.decodeToBytes(intArrayOf(SpecialToken.BOS.id), skipSpecialTokens = false)

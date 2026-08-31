@@ -13,6 +13,11 @@ interface Tokenizer {
         tokenIds: IntArray,
         skipSpecialTokens: Boolean = true,
     ): String
+
+    fun decodeLossy(
+        tokenIds: IntArray,
+        skipSpecialTokens: Boolean = true,
+    ): String = decode(tokenIds, skipSpecialTokens)
 }
 
 class TokenizerException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)

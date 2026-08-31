@@ -17,4 +17,11 @@ internal object Utf8Codec {
             throw TokenizerException("Token IDs do not form valid UTF-8", exception)
         }
     }
+
+    fun decodeLossy(bytes: ByteArray): String {
+        val decoder = StandardCharsets.UTF_8.newDecoder()
+            .onMalformedInput(CodingErrorAction.REPLACE)
+            .onUnmappableCharacter(CodingErrorAction.REPLACE)
+        return decoder.decode(ByteBuffer.wrap(bytes)).toString()
+    }
 }

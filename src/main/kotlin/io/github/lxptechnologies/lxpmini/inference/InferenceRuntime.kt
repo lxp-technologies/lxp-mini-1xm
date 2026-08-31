@@ -220,25 +220,12 @@ class InferenceRuntime internal constructor(
         onTextDelta: (String) -> Unit,
     ): CompletionResult {
         val promptTokenIds = encodePrompt(request)
-        val generatedTokenIds = ArrayList<Int>(request.maxNewTokens.coerceAtLeast(0))
-        var emittedText = ""
+        val textDecoder = IncrementalTextDecoder(tokenizer)
         val detailedGeneration = generateStreaming(request.toTokenGenerationRequest(promptTokenIds)) { step ->
-            generatedTokenIds += step.sampling.tokenId
-            val decoded = try {
-                tokenizer.decode(generatedTokenIds.toIntArray())
-            } catch (_: TokenizerException) {
-                return@generateStreaming
-            }
-            if (!decoded.startsWith(emittedText)) {
-                throw InferenceException("Tokenizer streaming output is not prefix-stable")
-            }
-            val delta = decoded.substring(emittedText.length)
-            if (delta.isNotEmpty()) {
-                onTextDelta(delta)
-                emittedText = decoded
-            }
+            textDecoder.accept(step.sampling.tokenId, onTextDelta)
         }
         val generation = detailedGeneration.generation
+        textDecoder.finish(onTextDelta)
         return completionResult(request, generation, detailedGeneration.metrics)
     }
 
@@ -268,8 +255,8 @@ class InferenceRuntime internal constructor(
             modelId = metadata.modelId,
             checkpointId = metadata.checkpointId,
             prompt = request.prompt,
-            generatedText = tokenizer.decode(generation.generatedTokenIds),
-            completeText = tokenizer.decode(generation.allTokenIds),
+            generatedText = tokenizer.decodeLossy(generation.generatedTokenIds),
+            completeText = tokenizer.decodeLossy(generation.allTokenIds),
             promptTokens = generation.promptTokenIds.size,
             generatedTokens = generation.generatedTokenIds.size,
             stoppedByEos = generation.stoppedByEos,
@@ -278,7 +265,7 @@ class InferenceRuntime internal constructor(
         )
     } catch (exception: TokenizerException) {
         throw InferenceException(
-            "Generated token IDs do not form valid text: ${generation.generatedTokenIds.contentToString()}",
+            "Generated token IDs cannot be decoded: ${generation.generatedTokenIds.contentToString()}",
             exception,
         )
     }

@@ -99,6 +99,19 @@ Le callback est exécuté pendant la génération, et non après avoir accumulé
 l'exception remonte à travers la boucle; le scope de requête et son cache KV sont tout de même fermés par `use`.
 Le runtime demeure `SERIALIZED` : plusieurs connexions peuvent attendre, mais un seul forward s'exécute à la fois.
 
+### Bytes générés et UTF-8 invalide
+
+Un tokenizer byte-level sait représenter les 256 valeurs possibles, mais une suite arbitraire de bytes n'est pas
+nécessairement du texte UTF-8 valide. C'est fréquent avec le tiny checkpoint de démonstration, encore insuffisamment
+entraîné pour toujours produire des séquences linguistiques valides.
+
+Le décodage reste strict dans le pipeline tokenizer afin de détecter les datasets et artefacts incorrects. Seule la
+frontière d'affichage de l'inférence utilise un décodage tolérant : chaque séquence invalide est remplacée par `�`
+(`U+FFFD`) plutôt que de transformer une completion valide au niveau des IDs en erreur HTTP 500. En SSE, un préfixe
+incomplet est d'abord mis en attente; s'il devient valide avec le token suivant, le caractère réel est diffusé. Le
+reliquat réellement invalide est remplacé et envoyé avant le chunk final, ce qui garantit que le texte streamé est
+identique au texte non streamé.
+
 ## Pourquoi Spring sans plugin Boot
 
 Le serveur utilise Spring Boot `3.5.16` comme BOM et Spring MVC embarqué. Cette ligne supporte Java 25 selon les
